@@ -59,7 +59,7 @@ function K_fitting = get_K(fitting_type, Re, D)
         case "ball"
             K_1 = 300;
             K_infinity = 0.1;
-
+    end
     K_fitting = (K_1 / Re) + K_infinity * (1 + (1 / (D * 39.37))); % K values are given with D in inches
 
 end
