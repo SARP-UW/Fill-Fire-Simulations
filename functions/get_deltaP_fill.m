@@ -40,10 +40,51 @@ function deltaP = get_deltaP(v, rho, mu, all_fittings)
     
     %% Calculate total equivalent length
     L_total_eq = L + L_eq;
+
+    %% Calculate pressure loss from hose
+    deltaP_hose = get_deltaP_hose(v, rho, mu, d);
     
     %% Calculate total pressure loss
     deltaP = (f * L_total_eq * v^2 * rho) / (D * 2);
 
+end
+
+function deltaP_hose = get_deltaP_hose(v, rho, mu, d)
+    % d - inner diameter of pipe (mm)
+    d_hose = ; % inner diameter of hose (mm) 
+    D_hose = d / 1000; % inner diameter of hose(m)
+    L_pre = 30 / 3.281; % length of hose before RF stand (m)
+    L_post = 4 / 3.281; % length of hosing after RF stand (m)
+    epsilon = 0.038; % absolute roughness of rubber hose (mm)
+    
+    % Calculate Reynolds Number
+    Re = (D_hose * v * rho) / mu;
+
+    % Calculate friction factor f with Serghide Approximation    
+    A = -2 * log10((epsilon / (3.7 * d_hose)) + (12 / Re));
+    B = -2 * log10((epsilon / (3.7 * d_hose)) + ((2.51 * A) / Re));
+    C = -2 * log10((epsilon / (3.7 * d_hose)) + ((2.51 * B) / Re));
+    f = (A - ((B-A)^2 / (C - (2 * B) + A)))^(-2);
+
+    % Calculate pressure losses from connections
+    K = ;% K bottle valve to hose
+
+    if d_hose > d
+        K = K + 0.5 * (1 - (d_hose ^ 2) / (d ^ 2))^2; % hose to RF
+        K = K + (1 - (d ^ 2) / (d_hose ^ 2))^2; % RF to hose
+    else if d_hose < d
+        K = K + (1 - (d_hose ^ 2) / (d^2))^2; % hose to RF
+        K = K + 0.5 * (1 - (d ^ 2) / (d_hose ^ 2))^2; % RF to hose
+    end
+
+    % Calculate equivalent length of connections
+    L_eq = (K * D_hose) / f;
+
+    % Calculate total equivalent length of hosing and connections
+    L_total_eq = L_pre + L_post + L_eq;
+
+    % Calculate pressure loss from hose and connections
+    deltaP_hose = (f * L_total_eq * v^2 * rho) / (D_hose * 2);
 end
 
 function K_fitting = get_K(fitting_type, Re, D)
