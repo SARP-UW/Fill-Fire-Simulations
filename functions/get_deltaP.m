@@ -3,18 +3,19 @@ function deltaP = get_deltaP(v, rho, mu, all_fittings)
     % v - average velocity of flow (m/s)
     % rho - density of nitrous (kg/m^3)
     % mu - absolute visocity (Pa * s)
-    % D - inner diameter (m)
-    % d - inner diameter (mm)
+    % D - pipe inner diameter (m)
+    % d - pipe inner diameter (mm)
     % L - length of piping
     % L_eq - equivalent length of fittings/valves
     % L_total_eq - total equivalent length
     % Re - reynolds number
     % all_fittings - string array of all the fittings
+        % valid arguments = "t_pass" "cross" "ball"
     
     %% Define Constants
-    d = 9; % inner diameter (mm) 
+    d = 10.2108; % inner diameter (mm) 
     D = d / 1000; % inner diameter (m)
-    L = ; % length of piping
+    L = ; % length of piping (m)
     epsilon = 0.015; % absolute roughness of stainless steel pipe
     
     %% Calculate Reynolds Number
@@ -28,9 +29,7 @@ function deltaP = get_deltaP(v, rho, mu, all_fittings)
     end
 
 
-    %% Calculate friction factor f with Serghide Approximation
-    d = D * 1000; % Inner Diameter (mm)
-    
+    %% Calculate friction factor f with Serghide Approximation    
     A = -2 * log10((epsilon / (3.7 * d)) + (12 / Re));
     B = -2 * log10((epsilon / (3.7 * d)) + ((2.51 * A) / Re));
     C = -2 * log10((epsilon / (3.7 * d)) + ((2.51 * B) / Re));
@@ -59,7 +58,11 @@ function K_fitting = get_K(fitting_type, Re, D)
         case "ball"
             K_1 = 300;
             K_infinity = 0.1;
+        case "t_elbow"
+            K_1 = 800;
+            K_infinity = 0.8;
     end
+
     K_fitting = (K_1 / Re) + K_infinity * (1 + (1 / (D * 39.37))); % K values are given with D in inches
 
 end
