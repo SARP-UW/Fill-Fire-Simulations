@@ -1,8 +1,8 @@
 function deltaP = get_deltaP(v, rho, mu, all_fittings)
     %% Define Variables (will put in documentation later)
-    % v - average velocity of flow (m/s)
+    % v - average velocity of nitrous flow (m/s)
     % rho - density of nitrous (kg/m^3)
-    % mu - absolute visocity (Pa * s)
+    % mu - absolute visocity of nitrous (Pa * s)
     % D - pipe inner diameter (m)
     % d - pipe inner diameter (mm)
     % L - length of piping
@@ -61,6 +61,9 @@ function K_fitting = get_K(fitting_type, Re, D)
         case "t_elbow"
             K_1 = 800;
             K_infinity = 0.8;
+        case "pipe_exit"
+            K_fitting = 1.0;
+            return
     end
 
     K_fitting = (K_1 / Re) + K_infinity * (1 + (1 / (D * 39.37))); % K values are given with D in inches
