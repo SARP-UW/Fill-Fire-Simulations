@@ -3,13 +3,14 @@ function deltaP = get_deltaP(v, rho, mu, all_fittings)
     % v - average velocity of flow (m/s)
     % rho - density of nitrous (kg/m^3)
     % mu - absolute visocity (Pa * s)
-    % D - inner diameter (m)
-    % d - inner diameter (mm)
+    % D - pipe inner diameter (m)
+    % d - pipe inner diameter (mm)
     % L - length of piping
     % L_eq - equivalent length of fittings/valves
     % L_total_eq - total equivalent length
     % Re - reynolds number
     % all_fittings - string array of all the fittings
+        % valid arguments = "t_pass" "cross" "ball"
     
     %% Define Constants
     d = 9; % inner diameter (mm) 
@@ -60,6 +61,7 @@ function K_fitting = get_K(fitting_type, Re, D)
             K_1 = 300;
             K_infinity = 0.1;
     end
+
     K_fitting = (K_1 / Re) + K_infinity * (1 + (1 / (D * 39.37))); % K values are given with D in inches
 
 end
