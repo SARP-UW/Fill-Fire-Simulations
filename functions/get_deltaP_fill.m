@@ -51,7 +51,7 @@ end
 
 function deltaP_hose = get_deltaP_hose(v, rho, mu, d)
     % d - inner diameter of pipe (mm)
-    d_hose = ; % inner diameter of hose (mm) 
+    d_hose = 8.80; % inner diameter of hose (mm) 
     D_hose = d / 1000; % inner diameter of hose(m)
     L_pre = 30 / 3.281; % length of hose before RF stand (m)
     L_post = 4 / 3.281; % length of hosing after RF stand (m)
