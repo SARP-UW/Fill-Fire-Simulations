@@ -1,28 +1,19 @@
-%% Calculates N2O mass flow (kg/s) combining SPI and HEM branches
+%% Calculates N2O line velocity (m/s)
 % View full documentation here: https://www.overleaf.com/read/yzpnyzrksypj#0a7d39
 %
 % Syntax:
-%   mdot_Ox = get_N2O_mass_flow(mdot_SPI, mdot_HEM, K)
-%
-% Description:
-%   Computes the total nitrous oxide mass flow rate by weighting the
-%   SPI and HEM mass flow contributions according to the exit loss
-%   coefficient, K.
+%   v_Ox = get_N2O_line_velocity(mdot_Ox, rho_Ox, D_i_Ox)
 %
 % Inputs:
-%   mdot_SPI - N2O mass flow from the SPI line (kg/s)
-%   mdot_HEM - N2O mass flow from the HEM line (kg/s)
-%   K        - exit loss coefficient (dimensionless, typically 1)
+%   mdot_Ox - Nitrous mass flow (kg/s)
+%   rho_Ox  - Nitrous density (kg/m^3)
+%   D_i_Ox  - N2O line inner diameter (in)
 %
 % Output:
-%   mdot_Ox  - combined N2O mass flow (kg/s)
+%   v_Ox - Flow velocity (m/s)
 
-function mdot_Ox = get_N2O_mass_flow(mdot_SPI, mdot_HEM, K)
-    % If K not specified, assume typical value of 1
-    if nargin < 3
-        K = 1;
-    end
-
-    % Combine flows based on exit loss coefficient
-    mdot_Ox = (1 - 1 / (1 + K)) * mdot_SPI + (1 / (1 + K)) * mdot_HEM;
+function v_Ox = get_N2O_line_velocity(mdot_Ox, rho_Ox, D_i_Ox)
+    D_m = D_i_Ox * 0.0254;       % convert inches → meters
+    A = pi * (D_m / 2)^2;        % cross-sectional area (m^2)
+    v_Ox = mdot_Ox / (rho_Ox * A);
 end
