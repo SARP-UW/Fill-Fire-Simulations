@@ -24,7 +24,7 @@ function K_fitting = get_K(fitting_type, Re, D)
         case "elbow_90_curve_SR_flange"
             K_1 = 800;
             K_infinity = 0.25;
-        case "elbow_80_curve_LR"
+        case "elbow_90_curve_LR"
             K_1 = 800;
             K_infinity = 0.2;
         case "elbow_90_mitered_singleweld"
