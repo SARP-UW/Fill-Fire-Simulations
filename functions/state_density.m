@@ -2,7 +2,7 @@
 %energy_old: kJ/kg
 %temperature_old: K
 
-function output = state_density(density_new, energy_old, temperature_old)
+function [t, x] = state_density(density_new, energy_old, temperature_old)
     % Get path to the data folder and access to the vapor and liquid property excel tables 
     this_file = mfilename('fullpath');
     this_folder = fileparts(this_file);
@@ -33,10 +33,12 @@ function output = state_density(density_new, energy_old, temperature_old)
 
     % Find the initial difference in the solver, as well as the temperature
     difference_old = (v_t - v_f)/(v_g - v_f) - (u_t - u_f)/(u_g - u_f);
+    x = ((v_t - v_f)/(v_g - v_f) + (u_t - u_f)/(u_g - u_f)) / 2;
     t_old = closest_row_liquid.Temperature_K;
     
-    % Initialize return variable
+    % Initialize return variables
     final_t = temperature_old;
+    final_x = x;
 
     % Ensure that the initial difference is positive in order to ensure the
     % solver is working properly
@@ -58,6 +60,7 @@ function output = state_density(density_new, energy_old, temperature_old)
         
         % Calculate difference for solver
         difference = (v_t - v_f)/(v_g - v_f) - (u_t - u_f)/(u_g - u_f);
+        final_x = ((v_t - v_f)/(v_g - v_f) + (u_t - u_f)/(u_g - u_f)) / 2;
         t = closest_row_liquid.Temperature_K;
 
         % If the difference now flips to negative, compute the temperature
@@ -72,7 +75,8 @@ function output = state_density(density_new, energy_old, temperature_old)
         difference_old = difference;
         t_old = t;
     end
-    
-    output = final_t;
+
+    t = final_t;
+    x = final_x;
 
 end
