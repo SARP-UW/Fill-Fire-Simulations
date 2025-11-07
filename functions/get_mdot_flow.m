@@ -1,7 +1,16 @@
 function mdot_flow = get_mdot_flow(P1, P2, rho, mu, v_prev, t)
     %% Define characteristics from input sheet
-    T = readtable();
-    ; % K-bottle flow coefficient
+    T = readcell('line_properties.xlsx');
+    
+    L = [T{4,2}, T{9,2}, T{13,2}];
+    L = L ./ 3.281; % Length of tubings (m)
+    D = [T{5,2}, T{10,2}, T{14,2}];
+    D = D ./ 39.37; % Inner diameter of tubings (m)
+    epsilon = [T{6,2}, T{11,2}, T{15,2}]; % Absolute roughness of pipes (mm)
+    Kv = T{7,2} * 0.865; % Convert Cv to Kv
+    v_initial =  T{}
+
+    rf_fittings = T{2:end, 3}; % String array of all fittings on the RF stand
 
 
     %% Calculate mdot
@@ -13,7 +22,7 @@ function mdot_flow = get_mdot_flow(P1, P2, rho, mu, v_prev, t)
         v_guess = v_prev; % get velocity from previous timestep
     end
 
-    diff = @(v) deltaP - guess_deltaP();
+    diff = @(v) deltaP - guess_deltaP(v_guess, rho, mu, L, D, epsilon, Kv, rf_fittings);
 
     v_actual = fzero(diff, v_guess);
 
@@ -21,15 +30,15 @@ function mdot_flow = get_mdot_flow(P1, P2, rho, mu, v_prev, t)
 
 end
 
-function guess = guess_deltaP(v_guess, rho, mu, D, L, epsilon)
+function guess = guess_deltaP(v_guess, rho, mu, L, D, epsilon, Kv, rf_fittings)
     %% Section 1
     A_1 = pi * D(1)^2 / 4; % cross sectional area of section 1 in m^2
     v_1 = v_guess; % v in section 1
 
     Re_1 = (D(1) * v_1 * rho) / mu;
-    f = get_friction_factor(D(1), epsilon(1), Re_1);
+    f_1 = get_friction_factor(D(1), epsilon(1), Re_1);
 
-    K_1 = Cv * 0.865; % convert flow cofficient of k-bottle to metric
+    K_1 = Kv; % convert flow cofficient of k-bottle to metric
     
     deltaP_1 = ( (rho * v_1^2) / 2) * ( (f_1 * L(1) / D(1)) + K_1);
  
@@ -37,16 +46,16 @@ function guess = guess_deltaP(v_guess, rho, mu, D, L, epsilon)
     A_2 = pi * D(2)^2 / 4; % cross sectional area of section 2 in m^2
     v_2 = v_1 * A_1 / A_2; % v in section 2
     Re_2 = (D(2) * v_2 * rho) / mu;
-    f = get_friction_factor(D(2), epsilon(2), Re_2);
+    f_2 = get_friction_factor(D(2), epsilon(2), Re_2);
 
     K_2 = 0;
     % K from diameter change
     if D(2) > D(1)
-        K = K + (1 - (D(1) ^ 2 ) / (D(2) ^ 2)) ^ 2;
+        K_2 = K_2 + (1 - (D(1) ^ 2 ) / (D(2) ^ 2)) ^ 2;
     else
-        K = K + 0.5 * (1 - (D(1) ^ 2 ) / (D(2) ^ 2)) ^ 2;
+        K_2 = K_2 + 0.5 * (1 - (D(1) ^ 2 ) / (D(2) ^ 2)) ^ 2;
     end
-    K_2 = K_2 + get_K_total(all_fittings, Re_2, D(2));
+    K_2 = K_2 + get_K_total(rf_fittings, Re_2, D(2));
 
     deltaP_2 = ( (rho * v_2^2) / 2) * ( (f_2 * L(2) / D(2)) + K_2);
 
@@ -56,7 +65,7 @@ function guess = guess_deltaP(v_guess, rho, mu, D, L, epsilon)
     v_3 = v_2 * A_2 / A_3; % v in section 3
     
     Re_3 = (D(3) * v_3 * rho) / mu;
-    f = get_friction_factor(D(3), epsilon(3), Re_3);
+    f_3 = get_friction_factor(D(3), epsilon(3), Re_3);
     
     K_3 = 0;
 
