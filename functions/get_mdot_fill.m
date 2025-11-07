@@ -7,22 +7,21 @@ function mdot_flow = get_mdot_flow(P1, P2, rho, mu, v_prev, t)
     D = [T{5,2}, T{10,2}, T{14,2}];
     D = D ./ 39.37; % Inner diameter of tubings (m)
     epsilon = [T{6,2}, T{11,2}, T{15,2}]; % Absolute roughness of pipes (mm)
-    Kv = T{7,2} * 0.865; % Convert Cv to Kv
-    v_initial =  T{}
+    Cv = T{7,2}; % K-bottle flow coefficient
 
-    rf_fittings = T{2:end, 3}; % String array of all fittings on the RF stand
+    rf_fittings = T{3:end, 3}; % String array of all fittings on the RF stand
 
 
     %% Calculate mdot
     deltaP = P1 - P2;
 
-    if t ~= 0
-        v_guess = 300; % initial velocity guess (m/s)
+    if t == 0
+        v_guess = T{3,5}; % Initial velocity guess
     else
-        v_guess = v_prev; % get velocity from previous timestep
+        v_guess = v_prev; % Get velocity from previous timestep
     end
 
-    diff = @(v) deltaP - guess_deltaP(v_guess, rho, mu, L, D, epsilon, Kv, rf_fittings);
+    diff = @(v) deltaP - guess_deltaP(v, rho, mu, L, D, epsilon, Cv, rf_fittings);
 
     v_actual = fzero(diff, v_guess);
 
@@ -30,7 +29,7 @@ function mdot_flow = get_mdot_flow(P1, P2, rho, mu, v_prev, t)
 
 end
 
-function guess = guess_deltaP(v_guess, rho, mu, L, D, epsilon, Kv, rf_fittings)
+function guess = guess_deltaP(v_guess, rho, mu, L, D, epsilon, Cv, rf_fittings)
     %% Section 1
     A_1 = pi * D(1)^2 / 4; % cross sectional area of section 1 in m^2
     v_1 = v_guess; % v in section 1
@@ -38,7 +37,7 @@ function guess = guess_deltaP(v_guess, rho, mu, L, D, epsilon, Kv, rf_fittings)
     Re_1 = (D(1) * v_1 * rho) / mu;
     f_1 = get_friction_factor(D(1), epsilon(1), Re_1);
 
-    K_1 = Kv; % convert flow cofficient of k-bottle to metric
+    K_1 = 2.148 * (10 ^ 9) * (D(1) ^ 4) / (Cv ^ 2); % Convert Cv to a resistance coefficient K
     
     deltaP_1 = ( (rho * v_1^2) / 2) * ( (f_1 * L(1) / D(1)) + K_1);
  
