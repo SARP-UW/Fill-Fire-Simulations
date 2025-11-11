@@ -1,4 +1,4 @@
-function mdot_flow = get_mdot_flow(P1, P2, rho, mu, v_prev, t)
+function mdot_flow = get_mdot_fill(P1, P2, rho, mu, mdot_prev, t)
     %% Define characteristics from input sheet
     T = readcell('line_properties.xlsx');
     
@@ -18,7 +18,7 @@ function mdot_flow = get_mdot_flow(P1, P2, rho, mu, v_prev, t)
     if t == 0
         v_guess = T{3,5}; % Initial velocity guess
     else
-        v_guess = v_prev; % Get velocity from previous timestep
+        v_guess = (4 * mdot_prev) / (rho * pi * D(1)^2); % Get velocity from previous timestep
     end
 
     diff = @(v) deltaP - guess_deltaP(v, rho, mu, L, D, epsilon, Cv, rf_fittings);
