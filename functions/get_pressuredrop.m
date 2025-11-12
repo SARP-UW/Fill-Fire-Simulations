@@ -1,4 +1,4 @@
-function deltaP = get_pressuredrop(mdot, rho, mu, K_total)
+function pressuredrop = get_pressuredrop(mdot, rho, mu, K_total)
     % mdot - mass flow rate of nitrous (lb/s)
     % rho - density of nitrous (kg/m^3)
     % mu - absolute visocity of nitrous (Pa * s)
@@ -30,36 +30,8 @@ function deltaP = get_pressuredrop(mdot, rho, mu, K_total)
     L_effective = L + L_eq;
 
     % Calculate pressure loss from pipes
-    deltaP_pipes = (f * L_effective * v^2 * rho) / (D * 2);
-
-    % Calculate total deltaP
-    deltaP = deltaP_pipes
+    pressuredrop = (f * L_effective * v^2 * rho) / (D * 2);
     
-end
-
-function deltaP_pipes = get_deltaP_pipes(v, rho, mu, K_total)
-    
-    %% Define Constants
-    d = 10.2108; % inner diameter of pipe(mm) 
-    D = d / 1000; % inner diameter of pipe (m)
-    L = ; % length of piping (m)
-    epsilon = 0.015; % absolute roughness of stainless steel pipe (mm)
-
-    %% Calculate Reynolds Number
-    Re = (D * v * rho) / mu;
-
-    %% Calculate friction factor f with Serghide Approximation    
-    f = get_friction_factor(d, epsilon, Re);
-
-    %% Calculate equivalent length of of all fittings/valves
-    L_eq = (K_total * D) / f;
-    
-    %% Calculate total effective length 
-    L_effective = L + L_eq;
-
-    %% Calculate pressure loss from pipes
-    deltaP_pipes = (f * L_effective * v^2 * rho) / (D * 2);
-
 end
 
 function f = get_friction_factor(d, epsilon, Re)
