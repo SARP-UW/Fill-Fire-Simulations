@@ -12,7 +12,6 @@
 %   rho_Ox  - N2O density (kg/m^3)
 
 function rho_Ox = get_N2O_density(phase, P_T_Ox)
-    % Placeholder lookup behavior – replace with actual table lookup
     if strcmpi(phase, 'liquid')
         rho_table = readtable('N2O_Liquid_Phase_Properties.csv');
     elseif strcmpi(phase, 'vapor')
