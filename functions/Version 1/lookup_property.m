@@ -10,6 +10,11 @@ function property = lookup_property(file, base_val, base_col, search_col)
     t_size = size(t);
     index = 0;
     
+    % Isentropic Relations fix, not great but works for now
+    if file == "isentropic_relations"
+        t(1, :) = [];
+    end
+
     % Find row of interest
     prev = t(1,base_col);
     for i = 2:t_size(1)
