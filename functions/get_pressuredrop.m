@@ -8,7 +8,7 @@ function pressuredrop = get_pressuredrop(mdot, rho, mu, K_total, tubeLength, tub
     mdot = mdot * 0.45359237; 
 
     %% Calculate fluid velocity
-    v = (4 * mdot) / (pi * rho * D_hose^2); % m/s
+    % v = (4 * mdot) / (pi * rho * D_hose^2); % m/s
 
     %% Calculate pressure loss from pipes
     % Define Constants
