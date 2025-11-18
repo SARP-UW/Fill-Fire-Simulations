@@ -188,13 +188,13 @@ for k = 1:Nt-1
 
     % ----- C,D: Nitrous tank pressure (psia / Pa) -----
     % Column C: P_T_Ox_psi, Column D: P_T_Ox_Pa
-    P_T_Ox_psi(k+1) = P_T_Ox_psi(k);          % TODO: plug in Column C formula
-    P_T_Ox_Pa(k+1)  = P_T_Ox_psi(k+1)*cf.psi_to_Pa;
+    P_T_Ox_psi(k) = P_T_Ox_psi(k);          % TODO: plug in Column C formula
+    P_T_Ox_Pa(k)  = P_T_Ox_psi(k+1)*cf.psi_to_Pa;
 
     % ----- F,G: Ethanol tank pressure (psia / Pa) -----
     % Column F: P_T_fu_psi, Column G: P_T_fu_Pa
-    P_T_fu_psi(k+1) = P_T_fu_psi(k);          % TODO: plug in Column F (ullage) formula
-    P_T_fu_Pa(k+1)  = P_T_fu_psi(k+1)*cf.psi_to_Pa;
+    P_T_fu_psi(k) = P_T_fu_psi(k);          % TODO: plug in Column F (ullage) formula
+    P_T_fu_Pa(k)  = P_T_fu_psi(k)*cf.psi_to_Pa;
 
     % ----- E: ρ_Ox from properties tables -----
     % Column E: rho_Ox, (rho_fu is analogous to ethanol density from I/O)
@@ -235,7 +235,7 @@ for k = 1:Nt-1
 
     dP_Min_Ox(k) = get_N2O_minor_dP( ...
         K_sum_Ox, mdotOx_ref*cf.kgs_to_lbmhr, ...
-        rho_Ox(k+1), Di_Ox_in);                             % AB
+        rho_Ox(k), Di_Ox_in);                             % AB
 
     Q_Ox_GPM(k)  = 15850.323*(mdotOx_ref/max(rho_Ox(k+1),1e-9)); % K (used for AC)
 
@@ -248,16 +248,16 @@ for k = 1:Nt-1
     % ----- AH,AI,AJ,AF,AG: Ethanol line ΔP maj/min/cmp and totals -----
     dP_Maj_fu(k) = get_ethanol_major_dP( ...
         f_fu(k), L_line_fu_ft, mdotFu_ref*cf.kgs_to_lbmhr, ...
-        rho_to_lbmft3(rho_fu(k+1)), Di_fu_in);              % AH
+        rho_to_lbmft3(rho_fu(k)), Di_fu_in);              % AH
 
     dP_Min_fu(k) = get_ethanol_minor_dP( ...
         K_sum_fu, mdotFu_ref*cf.kgs_to_lbmhr, ...
-        rho_to_lbmft3(rho_fu(k+1)), Di_fu_in);              % AI
+        rho_to_lbmft3(rho_fu(k)), Di_fu_in);              % AI
 
     Q_fu_GPM(k)  = 15850.323*(mdotFu_ref/max(rho_fu(k+1),1e-9)); % P, reused later
 
     dP_Cmp_fu(k) = get_ethanol_component_dP( ...
-        get_SG_ethanol(rho_fu(k+1)), Q_fu_GPM(k), Cv_main); % AJ
+        get_SG_ethanol(rho_fu(k)), Q_fu_GPM(k), Cv_main); % AJ
 
     dPsum_fu_psi(k) = get_ethanol_total_line_dP_psi( ...
                           dP_Maj_fu(k), dP_Min_fu(k), dP_Cmp_fu(k)); % AF
@@ -270,13 +270,13 @@ for k = 1:Nt-1
 
     % ----- AO,AP: N2O injector inlet pressure -----
     P_i_Ox_psi(k) = get_N2O_injector_inlet_pressure( ...
-                        P_T_Ox_psi(k+1), dPsum_Ox_psi(k));      % AO
+                        P_T_Ox_psi(k), dPsum_Ox_psi(k));      % AO
     P_i_Ox_Pa(k)  = convert_N2O_injector_pressure_pa( ...
                         P_i_Ox_psi(k));                         % AP
 
     % ----- AQ,AR: Ethanol injector inlet pressure -----
     P_i_fu_psi(k) = get_ethanol_injector_inlet_pressure( ...
-                        P_T_fu_psi(k+1), dPsum_fu_psi(k));      % AQ
+                        P_T_fu_psi(k), dPsum_fu_psi(k));      % AQ
     P_i_fu_Pa(k)  = convert_ethanol_injector_inlet_pressure_pa( ...
                         P_i_fu_psi(k));                         % AR
 
@@ -298,7 +298,7 @@ for k = 1:Nt-1
     rho_i_out_Ox(k)   = get_injector_outlet_density_N2O( ...
                             x_Ox(k), rho_i_out_g_Ox(k), rho_i_out_l_Ox(k)); % CA
 
-    H_tank_Ox(k)    = lookup_tank_enthalpy_N2O(P_T_Ox_psi(k+1));      % CB
+    H_tank_Ox(k)    = lookup_tank_enthalpy_N2O(P_T_Ox_psi(k));      % CB
     H_i_out_l_Ox(k) = lookup_injector_liquid_enthalpy_N2O( ...
                           ChPres_Pa(k)*cf.Pa_to_psi);                 % CC
     H_i_out_g_Ox(k) = lookup_injector_vapor_enthalpy_N2O( ...
@@ -321,7 +321,7 @@ for k = 1:Nt-1
 
     % ----- CH,CG: N2O mdot_SPI and mdot_HEM -----
     mdot_N2O_SPI(k) = get_mass_flow_SPI_N2O( ...
-        Cd_i_N2O, A_exit_i_N2O, rho_Ox(k+1), dPi_Ox_Pa(k));    % CH
+        Cd_i_N2O, A_exit_i_N2O, rho_Ox(k), dPi_Ox_Pa(k));    % CH
 
     mdot_N2O_HEM(k) = get_mass_flow_HEM_N2O( ...
         Cd_i_N2O, A_exit_i_N2O, rho_i_out_Ox(k), ...
@@ -345,11 +345,11 @@ for k = 1:Nt-1
     % ----- N,O,P,Q,R: Ethanol side mdot/velocities -----
     mdot_fu(k)     = get_ethanol_mdot_simple( ...
                          Cd_i_fu, A_exit_i_fu, ...
-                         rho_fu(k+1), dPi_fu_Pa(k));           % N
+                         rho_fu(k), dPi_fu_Pa(k));           % N
     mdot_fu_lbh(k) = mdot_fu(k)*cf.kgs_to_lbmhr;               % O
-    v_fu_ms(k)     = line_velocity(mdot_fu(k), rho_fu(k+1), Di_fu); % Q
+    v_fu_ms(k)     = line_velocity(mdot_fu(k), rho_fu(k), Di_fu); % Q
     v_fu_fts(k)    = v_fu_ms(k)/cf.ft_to_m;                    % R
-    Q_fu_GPM(k)    = 15850.323*(mdot_fu(k)/max(rho_fu(k+1),1e-9));  % P (refined)
+    Q_fu_GPM(k)    = 15850.323*(mdot_fu(k)/max(rho_fu(k),1e-9));  % P (refined)
 
     % ----- H: total mass flow -----
     mdot_sum(k) = mdot_Ox(k) + mdot_fu(k);                     % H
@@ -372,16 +372,16 @@ for k = 1:Nt-1
                            cstar, mdot_sum(k), A_throat);      % AV
 
     % BA: chamber temperature – here just propagated
-    ChTmp_K(k+1) = ChTmp_K(k);                                % BA (can refine later)
+    ChTmp_K(k) = ChTmp_K(k);                                % BA (can refine later)
 
     % BC: exit Mach number
-    M_exit(k+1)  = get_exit_mach_number(M_exit_120, M_exit_125, gamma_cmb); % BC
+    M_exit(k)  = get_exit_mach_number(M_exit_120, M_exit_125, gamma_cmb); % BC
 
     % BB: exit gas temperature
-    ExhtTmp_K(k) = get_exit_temperature(ChTmp_K(k+1), gamma_cmb, M_exit(k+1)); % BB
+    ExhtTmp_K(k) = get_exit_temperature(ChTmp_K(k), gamma_cmb, M_exit(k)); % BB
 
     % AZ: pressure ratio P/P0
-    P_ratio(k)   = get_pressure_ratio_P_over_P0(gamma_cmb, M_exit(k+1)); % AZ
+    P_ratio(k)   = get_pressure_ratio_P_over_P0(gamma_cmb, M_exit(k)); % AZ
 
     % ----- AY: corrected chamber pressure (Pa) -----
     ChPres_Pa(k+1) = get_corrected_chamber_pressure_pa( ...
@@ -390,8 +390,8 @@ for k = 1:Nt-1
     % AX (psia) is just ChPres_Pa*Pa_to_psi when needed in lookups.
 
     % ----- BD,BE: exit velocity and exit pressure -----
-    V_exit(k)      = get_exit_velocity(M_exit(k+1), gamma_cmb, R_cmb, ExhtTmp_K(k)); % BD
-    ExhtPres_Pa(k) = get_exit_pressure(ChPres_Pa(k+1), P_ratio(k));                  % BE
+    V_exit(k)      = get_exit_velocity(M_exit(k), gamma_cmb, R_cmb, ExhtTmp_K(k)); % BD
+    ExhtPres_Pa(k) = get_exit_pressure(ChPres_Pa(k), P_ratio(k));                  % BE
 
     %% =====================================================================
     %% LAYER 16–18  (BI, BJ, BK, BL, BM, BN, BO, BT, BP)
@@ -432,11 +432,11 @@ for k = 1:Nt-1
     % ----- BT: instantaneous Δv -----
     deltaV_inst(k) = get_instantaneous_deltaV( ...
                         Thst_N(k), ...
-                        t(min(k+1,Nt)), t(k), ...
+                        t(min(k,Nt)), t(k), ...
                         m_Ox(k), m_fu(k));                    % BT
 
     % ----- BP: engine status -----
-    status(k) = get_engine_status(m_Ox(k+1), m_fu(k+1));      % BP
+    status(k) = get_engine_status(m_Ox(k), m_fu(k));      % BP
 
 end
 
