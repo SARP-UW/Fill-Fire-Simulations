@@ -1,0 +1,118 @@
+clear all; close all; clc;
+%% Shared inputs
+mdot_total   = 1.2444;     % kg/s
+MR           = 3.9;        % ox/fuel
+
+% Nitrous line + injector inputs 
+
+P_tank_N2O    = 661.71;    % psi
+rho_N2O       = 816.99;    % nitrous density [kg/m^3]
+mu_N2O        = 0.073564;  % cP
+
+OD_N2O        = 0.5;       % in
+t_N2O         = 0.049;     % in
+rough_N2O     = 0.0005906; % in
+L_N2O_ft      = (15/12);   % Nitrous line length [ft]
+
+theta_N2O     = 180;       % deg (total bend angle) 
+Bend_rad_N2O  = 1.5;       % in
+M_bend_N2O    = 13.5;      % Bend Turbulent Friction Factor Multiplier
+
+K1_tee_N2O    = 200;
+Kinf_N2O      = 0.1;       % K_inf (k inf)
+Kentr_N2O     = .5;        % entrance loss K
+Kexit_N2O     = 1;         % exit loss K
+Cv_main_N2O   = 8.2;       % main valve Cv
+
+stiff_ox      = 0.21;      % ox stiffness
+
+
+% Ethanol line + injector inputs 
+
+P_tank_eth    = 670;       % psia
+rho_eth       = 855.64;    % ethanol density [kg/m^3]
+mu_eth        = 1.04;      % cP
+
+OD_eth        = 0.375;     % in
+t_eth         = 0.035;     % in
+rough_eth     = 0.0005906; % in
+L_eth_ft      = (45/12);   % ethanol line length [ft]
+
+theta_eth     = 405;       % deg
+Bend_rad_eth  = 15/16;     % in
+M_bend_eth    = 13.5;      % bend turb friction factor multiplier
+
+K1_tee_eth    = 200;
+Kinf_eth      = 0.1;
+Kentr_eth     = .5;        % entrance loss K
+Kexit_eth     = 1;         % exit loss K
+Cv_main_eth   = 8.2;       % main valve Cv
+
+stiff_fuel    = 0.25;     % fuel stiffness
+
+
+% Package into structs for the function
+%  FLUID PROPERTIES 
+
+fluid_N2O.rho_kg_m3 = rho_N2O;
+fluid_N2O.mu_cP     = mu_N2O;
+
+fluid_eth.rho_kg_m3 = rho_eth;
+fluid_eth.mu_cP     = mu_eth;
+
+%  GEOMETRY 
+
+geom_N2O.L_ft              = L_N2O_ft;
+geom_N2O.OD_in             = OD_N2O;
+geom_N2O.wall_in           = t_N2O;
+geom_N2O.absRough_in       = rough_N2O;
+geom_N2O.bendRadius_in     = Bend_rad_N2O;
+geom_N2O.totalBendAngleDeg = theta_N2O;
+
+geom_eth.L_ft              = L_eth_ft;
+geom_eth.OD_in             = OD_eth;
+geom_eth.wall_in           = t_eth;
+geom_eth.absRough_in       = rough_eth;
+geom_eth.bendRadius_in     = Bend_rad_eth;
+geom_eth.totalBendAngleDeg = theta_eth;
+
+%  LOSSES 
+
+losses_N2O.M_bend  = M_bend_N2O;
+losses_N2O.K1_tee  = K1_tee_N2O;
+losses_N2O.Kint    = Kinf_N2O;       % K_inf (k inf)
+losses_N2O.Kentr   = Kentr_N2O;
+losses_N2O.Kexit   = Kexit_N2O;
+losses_N2O.Cv_main = Cv_main_N2O;
+
+losses_eth.M_bend  = M_bend_eth;
+losses_eth.K1_tee  = K1_tee_eth;
+losses_eth.Kint    = Kinf_eth;
+losses_eth.Kentr   = Kentr_eth;
+losses_eth.Kexit   = Kexit_eth;
+losses_eth.Cv_main = Cv_main_eth;
+
+%% Call the function for N2O (oxidizer)
+[P_inlet_ox, P_exit_ox, info_ox] = line_injector_exit_pressure( ...
+    P_tank_N2O, stiff_ox, ...
+    mdot_total, MR, true, ...           % true = oxidizer line
+    fluid_N2O, geom_N2O, losses_N2O);
+
+%% Call the function for ethanol (fuel)
+[P_inlet_fuel, P_exit_fuel, info_fuel] = line_injector_exit_pressure( ...
+    P_tank_eth, stiff_fuel, ...
+    mdot_total, MR, false, ...          % false = fuel line
+    fluid_eth, geom_eth, losses_eth);
+
+%% Compare exit pressures
+Tol = 5; % psi
+
+pressureDifference = abs(P_exit_ox - P_exit_fuel);
+fprintf('P_exit_ox   = %.2f psi\n', P_exit_ox);
+fprintf('P_exit_fuel = %.2f psi\n', P_exit_fuel);
+
+if pressureDifference <= Tol
+    disp('Pressure difference is within tolerance.');
+else
+    disp('Pressure difference exceeds tolerance.');
+end

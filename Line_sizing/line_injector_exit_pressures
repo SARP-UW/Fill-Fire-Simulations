@@ -1,0 +1,117 @@
+function [P_inlet_psi, P_exit_psi, info] = line_injector_exit_pressure( ...
+        tankPressure_psi, stiffness, ...
+        mDot_total_kg_s, MR, isOxidizerLine, ...
+        fluid, geom, losses)
+
+%  Compute inlet and exit injector pressure per line
+
+% INPUTS
+%   tankPressure_psi : tank pressure [psi]
+%   stiffness        : injector stiffness factor (0–1), P_exit = P_in*(1-stiffness)
+%   mDot_total_kg_s  : total engine mass flow [kg/s] (ox + fuel)
+%   MR               : mixture ratio (ox/fuel)
+%   isOxidizerLine   : true for oxidizer line, false for fuel line
+%
+%   fluid : struct with fields
+%       rho_kg_m3   : density [kg/m^3]
+%       mu_cP       : dynamic viscosity [cP]
+%
+%   geom : struct with fields
+%       L_ft              : line length [ft]
+%       OD_in             : outer diameter [in]
+%       wall_in           : wall thickness [in]
+%       absRough_in       : absolute roughness [in]
+%       bendRadius_in     : bend radius [in]
+%       totalBendAngleDeg : total bend angle [deg]
+%
+%   losses : struct with fields
+%       M_bend      : bend turbulent friction multiplier
+%       K1_tee      : "K1 through tee"
+%       Kint        : K_inf (k inf) from your notes
+%       Kentr       : entrance loss K
+%       Kexit       : exit loss K
+%       Cv_main     : main valve Cv
+%
+% OUTPUTS
+%   P_inlet_psi : pressure at injector inlet [psi]
+%   P_exit_psi  : pressure at injector exit  [psi]
+%   info        : struct of intermediate quantities
+
+%  constants
+lb_per_kg = 2.2046226218;
+hr_per_s  = 3600;
+ID_in = geom.OD_in - 2*geom.wall_in;      % inner diameter [in]
+
+% Convert density from kg/m^3 to lb/ft^3
+kg_m3_to_lb_ft3 = 0.06242796;             % 1 kg/m^3 = 0.06243 lb/ft^3
+rho_lb_ft3 = fluid.rho_kg_m3 * kg_m3_to_lb_ft3;
+
+% mass flow (lb/hr)
+if isOxidizerLine
+    mDot_line_kg_s = mDot_total_kg_s * MR/(1+MR);
+else
+    mDot_line_kg_s = mDot_total_kg_s * 1/(1+MR);
+end
+
+mDot_line_lb_hr = mDot_line_kg_s * lb_per_kg * hr_per_s;
+
+%  friction factor 
+relRough = geom.absRough_in / ID_in;
+f = 0.25 / ( log10(relRough/3.7)^2 );   % turbulent friction factor
+
+
+
+%bend radius
+K90 = losses.M_bend * f;
+
+%  major loss ΔP_major (psi) 
+C_major = 3.359e-6;
+dP_major = C_major * ( f * geom.L_ft * mDot_line_lb_hr^2 / ...
+                      ( rho_lb_ft3 * ID_in^5 ) );
+
+%  Reynolds number 
+Re = 6.315 * mDot_line_lb_hr / ( ID_in * fluid.mu_cP );
+
+%  K from bends
+bend_e_over_D = geom.bendRadius_in / ID_in;
+K_bends = (geom.totalBendAngleDeg/90 - 1) * ...
+          ( (pi/4) * f * bend_e_over_D + 0.5*K90 ) + K90;
+
+%  K from tees 
+K_tees = losses.K1_tee / Re + losses.Kint * (1 + 1/ID_in);
+
+%  minor loss ΔP_minor (psi) 
+K_total = K_tees + K_bends + losses.Kentr + losses.Kexit;
+
+C_minor = 2.799e-7;
+dP_minor = C_minor * ( K_total * mDot_line_lb_hr^2 / ...
+                      ( rho_lb_ft3 * ID_in^4 ) );
+
+%  component ΔP across main valve (psi) 
+SG = fluid.rho_kg_m3 / 1000;  % specific gravity
+
+% volumetric flow in GPM
+Q_m3_s = mDot_line_kg_s / fluid.rho_kg_m3;
+Q_gpm  = Q_m3_s * 15850.323;
+
+dP_comp = SG * (Q_gpm / losses.Cv_main)^2;
+
+%  pressures 
+P_inlet_psi = tankPressure_psi - dP_major - dP_minor - dP_comp;
+P_exit_psi  = P_inlet_psi * (1 - stiffness);
+
+%  pack info 
+info = struct();
+info.ID_in           = ID_in;
+info.mDot_line_lb_hr = mDot_line_lb_hr;
+info.f               = f;
+info.Re              = Re;
+info.K90             = K90;
+info.K_bends         = K_bends;
+info.K_tees          = K_tees;
+info.K_total         = K_total;
+info.dP_major_psi    = dP_major;
+info.dP_minor_psi    = dP_minor;
+info.dP_comp_psi     = dP_comp;
+
+end
