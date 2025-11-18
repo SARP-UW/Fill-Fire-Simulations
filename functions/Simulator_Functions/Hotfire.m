@@ -1,4 +1,4 @@
-function out = run_hotfire_from_calculations_sheet()
+awefunction out = run_hotfire_from_calculations_sheet()
 %RUN_HOTFIRE_FROM_CALCULATIONS_SHEET
 % Drives the transient DC hotfire sim strictly in the order of the
 % "Calculations" sheet columns (C → CH), while pulling constants/props
@@ -162,125 +162,284 @@ M_exit(1) = get_exit_mach_number(M_exit_120, M_exit_125, gamma_cmb);
 
 %% 6) March over time, following Calculations sheet order
 for k = 1:Nt-1
-    % ----- C,D: Nitrous tank pressure (psia/Pa) -----
-    P_T_Ox_psi(k+1) = P_T_Ox_psi(k);  % or apply your Column C formula here
+
+    %% =====================================================================
+    %% LAYER 1  (A, B, T, U, V, AM, AS, AT, BA, BC, BF, BG, BH, BQ, BR, BS, CF)
+    %% Base state & constants: time, dt, masses, phases, friction constants,
+    %% combustion properties, D1/D2 thrust history factors.
+    %% =====================================================================
+
+    % D1 (BG) and D2 (BH) depend only on previous thrust and dt (previous rows)
+    if k > 2
+        D1(k) = get_D1_factor(RThst_N(k-1), RThst_N(k-2));   % BG
+    else
+        D1(k) = 1;                                           % BG (startup)
+    end
+    D2(k) = get_D2_factor(dt(k), k);                         % BH
+
+    % t (A), dt (B), m_Ox (S), m_fu (U), Phase N2O (T), c*, gamma_cmb, etc.
+    % are taken from I/O or previous step and assumed already defined:
+    %   t(k), dt(k), m_Ox(k), m_fu(k), PhaseN2O(k), cstar, gamma_cmb, R_cmb, etc.
+
+    %% =====================================================================
+    %% LAYER 2–3  (C, D, E, F, G, S)
+    %% Tank pressures and densities for current row (k+1)
+    %% =====================================================================
+
+    % ----- C,D: Nitrous tank pressure (psia / Pa) -----
+    % Column C: P_T_Ox_psi, Column D: P_T_Ox_Pa
+    P_T_Ox_psi(k+1) = P_T_Ox_psi(k);          % TODO: plug in Column C formula
     P_T_Ox_Pa(k+1)  = P_T_Ox_psi(k+1)*cf.psi_to_Pa;
 
-    % ----- F,G: Ethanol tank pressure (psia/Pa) -----
-    P_T_fu_psi(k+1) = P_T_fu_psi(k);  % or Column F formula (ullage compression)
+    % ----- F,G: Ethanol tank pressure (psia / Pa) -----
+    % Column F: P_T_fu_psi, Column G: P_T_fu_Pa
+    P_T_fu_psi(k+1) = P_T_fu_psi(k);          % TODO: plug in Column F (ullage) formula
     P_T_fu_Pa(k+1)  = P_T_fu_psi(k+1)*cf.psi_to_Pa;
 
     % ----- E: ρ_Ox from properties tables -----
-    rho_Ox(k+1) = table_lookup_density_N2O_fromP(P_T_Ox_psi(k+1), n2oLiq, n2oVap);
-    rho_fu(k+1) = rho_fu(k); % update if you model fu temperature/pressure
+    % Column E: rho_Ox, (rho_fu is analogous to ethanol density from I/O)
+    rho_Ox(k+1) = table_lookup_density_N2O_fromP( ...
+                      P_T_Ox_psi(k+1), n2oLiq, n2oVap);      % E
+    rho_fu(k+1) = rho_fu(k);                                % keep simple for now
 
-    % ----- AK,AL: Reynolds (needs mdot guess; use previous) -----
+    % S, U (masses) get updated later (after mdot) – see Layer 13.
+
+    %% =====================================================================
+    %% LAYER 4–6  (AK, AL, AM, AN, AA, AB, AC, Y, Z,
+    %%             AH, AI, AJ, AF, AG)
+    %% Line Reynolds numbers, friction factors, and line ΔP for N2O & ethanol
+    %% =====================================================================
+
+    % ----- AK,AL: Reynolds numbers (using previous-step mdot as a reference) -----
     mdotOx_ref = max(mdot_Ox(max(k,1)), 0);
     mdotFu_ref = max(mdot_fu(max(k,1)), 0);
-    Re_Ox(k)   = get_Re_N2O(mdotOx_ref*cf.kgs_to_lbmhr, Di_Ox_in, get_viscosity_cp(P_T_Ox_psi(k), n2oLiq, n2oVap));
-    Re_fu(k)   = get_Re_ethanol(mdotFu_ref*cf.kgs_to_lbmhr, Di_fu_in, get_viscosity_cp_ethanol());
+
+    Re_Ox(k) = get_Re_N2O( ...
+        mdotOx_ref*cf.kgs_to_lbmhr, ...
+        Di_Ox_in, ...
+        get_viscosity_cp(P_T_Ox_psi(k), n2oLiq, n2oVap));   % AK
+
+    Re_fu(k) = get_Re_ethanol( ...
+        mdotFu_ref*cf.kgs_to_lbmhr, ...
+        Di_fu_in, ...
+        get_viscosity_cp_ethanol());                        % AL
 
     % ----- AM,AN: Darcy friction factors -----
-    f_Ox(k) = get_friction_factor_N2O(eps_Ox_in, Di_Ox_in, max(Re_Ox(k),1));
-    f_fu(k) = get_friction_factor_ethanol(eps_fu_in, Di_fu_in, max(Re_fu(k),1));
+    f_Ox(k) = get_friction_factor_N2O(eps_Ox_in, Di_Ox_in, max(Re_Ox(k),1)); % AM
+    f_fu(k) = get_friction_factor_ethanol(eps_fu_in, Di_fu_in, max(Re_fu(k),1)); % AN
 
-    % ----- AA,AB,AC: N2O line ΔP maj/min/cmp (psi) -----
-    dP_Maj_Ox(k) = get_N2O_major_dP(f_Ox(k), L_line_Ox_ft, mdotOx_ref*cf.kgs_to_lbmhr, rho_Ox(k+1), Di_Ox_in);
-    dP_Min_Ox(k) = get_N2O_minor_dP(K_sum_Ox, mdotOx_ref*cf.kgs_to_lbmhr, rho_Ox(k+1), Di_Ox_in);
-    Q_Ox_GPM(k)  = 15850.323*(mdotOx_ref/max(rho_Ox(k+1),1e-9)); % K
-    dP_Cmp_Ox(k) = get_N2O_component_dP(rho_Ox(k+1), Q_Ox_GPM(k), Cv_main);
-    dPsum_Ox_psi(k) = dP_Maj_Ox(k) + dP_Min_Ox(k) + dP_Cmp_Ox(k);
-    dPsum_Ox_Pa(k)  = dPsum_Ox_psi(k)*cf.psi_to_Pa;
+    % ----- AA,AB,AC,Y,Z: N2O line ΔP maj/min/cmp and totals -----
+    dP_Maj_Ox(k) = get_N2O_major_dP( ...
+        f_Ox(k), L_line_Ox_ft, mdotOx_ref*cf.kgs_to_lbmhr, ...
+        rho_Ox(k+1), Di_Ox_in);                             % AA
 
-    % ----- AO,AP: N2O injector inlet P -----
-    P_i_Ox_psi(k) = get_N2O_injector_inlet_pressure(P_T_Ox_psi(k+1), dPsum_Ox_psi(k));
-    P_i_Ox_Pa(k)  = convert_N2O_injector_pressure_pa(P_i_Ox_psi(k));
+    dP_Min_Ox(k) = get_N2O_minor_dP( ...
+        K_sum_Ox, mdotOx_ref*cf.kgs_to_lbmhr, ...
+        rho_Ox(k+1), Di_Ox_in);                             % AB
 
-    % ----- AH,AI,AJ: Ethanol line ΔP maj/min/cmp (psi) -----
-    dP_Maj_fu(k) = get_ethanol_major_dP(f_fu(k), L_line_fu_ft, mdotFu_ref*cf.kgs_to_lbmhr, rho_to_lbmft3(rho_fu(k+1)), Di_fu_in);
-    dP_Min_fu(k) = get_ethanol_minor_dP(K_sum_fu, mdotFu_ref*cf.kgs_to_lbmhr, rho_to_lbmft3(rho_fu(k+1)), Di_fu_in);
-    Q_fu_GPM(k)  = 15850.323*(mdotFu_ref/max(rho_fu(k+1),1e-9)); % P
-    dP_Cmp_fu(k) = get_ethanol_component_dP(get_SG_ethanol(rho_fu(k+1)), Q_fu_GPM(k), Cv_main);
-    dPsum_fu_psi(k) = get_ethanol_total_line_dP_psi(dP_Maj_fu(k), dP_Min_fu(k), dP_Cmp_fu(k));
-    dPsum_fu_Pa(k)  = convert_ethanol_dP_psi_to_pa(dPsum_fu_psi(k));
+    Q_Ox_GPM(k)  = 15850.323*(mdotOx_ref/max(rho_Ox(k+1),1e-9)); % K (used for AC)
 
-    % ----- AQ,AR: Ethanol injector inlet P -----
-    P_i_fu_psi(k) = get_ethanol_injector_inlet_pressure(P_T_fu_psi(k+1), dPsum_fu_psi(k));
-    P_i_fu_Pa(k)  = convert_ethanol_injector_inlet_pressure_pa(P_i_fu_psi(k));
+    dP_Cmp_Ox(k) = get_N2O_component_dP( ...
+        rho_Ox(k+1), Q_Ox_GPM(k), Cv_main);                 % AC
 
-    % ----- BU…BX,BY…CA,CB…CE: N2O quality, entropies, densities, enthalpies -----
+    dPsum_Ox_psi(k) = dP_Maj_Ox(k) + dP_Min_Ox(k) + dP_Cmp_Ox(k); % Y
+    dPsum_Ox_Pa(k)  = dPsum_Ox_psi(k)*cf.psi_to_Pa;               % Z
+
+    % ----- AH,AI,AJ,AF,AG: Ethanol line ΔP maj/min/cmp and totals -----
+    dP_Maj_fu(k) = get_ethanol_major_dP( ...
+        f_fu(k), L_line_fu_ft, mdotFu_ref*cf.kgs_to_lbmhr, ...
+        rho_to_lbmft3(rho_fu(k+1)), Di_fu_in);              % AH
+
+    dP_Min_fu(k) = get_ethanol_minor_dP( ...
+        K_sum_fu, mdotFu_ref*cf.kgs_to_lbmhr, ...
+        rho_to_lbmft3(rho_fu(k+1)), Di_fu_in);              % AI
+
+    Q_fu_GPM(k)  = 15850.323*(mdotFu_ref/max(rho_fu(k+1),1e-9)); % P, reused later
+
+    dP_Cmp_fu(k) = get_ethanol_component_dP( ...
+        get_SG_ethanol(rho_fu(k+1)), Q_fu_GPM(k), Cv_main); % AJ
+
+    dPsum_fu_psi(k) = get_ethanol_total_line_dP_psi( ...
+                          dP_Maj_fu(k), dP_Min_fu(k), dP_Cmp_fu(k)); % AF
+    dPsum_fu_Pa(k)  = convert_ethanol_dP_psi_to_pa(dPsum_fu_psi(k)); % AG
+
+    %% =====================================================================
+    %% LAYER 6–7  (AO, AP, AQ, AR, BU, BV, BW, BX, BY, BZ, CA, CB, CC, CD, CE)
+    %% Injector inlet pressures & N2O thermo state at injector outlet
+    %% =====================================================================
+
+    % ----- AO,AP: N2O injector inlet pressure -----
+    P_i_Ox_psi(k) = get_N2O_injector_inlet_pressure( ...
+                        P_T_Ox_psi(k+1), dPsum_Ox_psi(k));      % AO
+    P_i_Ox_Pa(k)  = convert_N2O_injector_pressure_pa( ...
+                        P_i_Ox_psi(k));                         % AP
+
+    % ----- AQ,AR: Ethanol injector inlet pressure -----
+    P_i_fu_psi(k) = get_ethanol_injector_inlet_pressure( ...
+                        P_T_fu_psi(k+1), dPsum_fu_psi(k));      % AQ
+    P_i_fu_Pa(k)  = convert_ethanol_injector_inlet_pressure_pa( ...
+                        P_i_fu_psi(k));                         % AR
+
+    % ----- BU…BX,BY…CA,CB…CE: N2O entropy, quality, densities, enthalpies -----
     S_Ox(k)         = lookup_entropy_from_P(P_T_Ox_psi(k+1));          % BU
-    S_i_out_l_Ox(k) = lookup_entropy_liq_from_P(ChPres_Pa(k)*cf.Pa_to_psi); % BV
-    S_i_out_g_Ox(k) = lookup_entropy_vap_from_P(ChPres_Pa(k)*cf.Pa_to_psi); % BW
-    x_Ox(k)         = get_quality_N2O(S_Ox(k), S_i_out_l_Ox(k), S_i_out_g_Ox(k)); % BX
 
-    rho_i_out_l_Ox(k) = lookup_rho_liq_from_P(ChPres_Pa(k)*cf.Pa_to_psi); % BY
-    rho_i_out_g_Ox(k) = lookup_rho_vap_from_P(ChPres_Pa(k)*cf.Pa_to_psi); % BZ
-    rho_i_out_Ox(k)   = get_injector_outlet_density_N2O(x_Ox(k), rho_i_out_g_Ox(k), rho_i_out_l_Ox(k)); % CA
+    % Use previous-step chamber pressure for state at injector outlet
+    S_i_out_l_Ox(k) = lookup_entropy_liq_from_P( ...
+                        ChPres_Pa(k)*cf.Pa_to_psi);                    % BV
+    S_i_out_g_Ox(k) = lookup_entropy_vap_from_P( ...
+                        ChPres_Pa(k)*cf.Pa_to_psi);                    % BW
+    x_Ox(k)         = get_quality_N2O( ...
+                        S_Ox(k), S_i_out_l_Ox(k), S_i_out_g_Ox(k));    % BX
 
-    H_tank_Ox(k)    = lookup_tank_enthalpy_N2O(P_T_Ox_psi(k+1));           % CB
-    H_i_out_l_Ox(k) = lookup_injector_liquid_enthalpy_N2O(ChPres_Pa(k)*cf.Pa_to_psi); % CC
-    H_i_out_g_Ox(k) = lookup_injector_vapor_enthalpy_N2O(ChPres_Pa(k)*cf.Pa_to_psi);  % CD
-    H_i_out_N2O(k)  = get_injector_enthalpy_N2O(x_Ox(k), H_i_out_g_Ox(k), H_i_out_l_Ox(k)); % CE
+    rho_i_out_l_Ox(k) = lookup_rho_liq_from_P( ...
+                            ChPres_Pa(k)*cf.Pa_to_psi);                % BY
+    rho_i_out_g_Ox(k) = lookup_rho_vap_from_P( ...
+                            ChPres_Pa(k)*cf.Pa_to_psi);                % BZ
+    rho_i_out_Ox(k)   = get_injector_outlet_density_N2O( ...
+                            x_Ox(k), rho_i_out_g_Ox(k), rho_i_out_l_Ox(k)); % CA
+
+    H_tank_Ox(k)    = lookup_tank_enthalpy_N2O(P_T_Ox_psi(k+1));      % CB
+    H_i_out_l_Ox(k) = lookup_injector_liquid_enthalpy_N2O( ...
+                          ChPres_Pa(k)*cf.Pa_to_psi);                 % CC
+    H_i_out_g_Ox(k) = lookup_injector_vapor_enthalpy_N2O( ...
+                          ChPres_Pa(k)*cf.Pa_to_psi);                 % CD
+    H_i_out_N2O(k)  = get_injector_enthalpy_N2O( ...
+                          x_Ox(k), H_i_out_g_Ox(k), H_i_out_l_Ox(k)); % CE
+
+    %% =====================================================================
+    %% LAYER 8–9  (W, X, AD, CH, CG)
+    %% Injector ΔP and N2O mass flow models (SPI & HEM)
+    %% =====================================================================
 
     % ----- W,X: N2O injector ΔP -----
-    dPi_Ox_Pa(k)  = max(P_i_Ox_Pa(k) - ChPres_Pa(k), 0);
-    dPi_Ox_psi(k) = dPi_Ox_Pa(k)*cf.Pa_to_psi;
+    dPi_Ox_Pa(k)  = max(P_i_Ox_Pa(k) - ChPres_Pa(k), 0);       % W
+    dPi_Ox_psi(k) = dPi_Ox_Pa(k)*cf.Pa_to_psi;                 % X
 
-    % ----- CH,CG + I: mdot_N2O_SPI, mdot_N2O_HEM and blended mdot_Ox -----
-    mdot_N2O_SPI(k) = get_mass_flow_SPI_N2O(Cd_i_N2O, A_exit_i_N2O, rho_Ox(k+1), dPi_Ox_Pa(k)); % CH
-    mdot_N2O_HEM(k) = get_mass_flow_HEM_N2O(Cd_i_N2O, A_exit_i_N2O, rho_i_out_Ox(k), H_tank_Ox(k), H_i_out_g_Ox(k)); % CG
-    mdot_Ox(k)      = (1 - 1/(1+K_blend))*mdot_N2O_SPI(k) + (1/(1+K_blend))*mdot_N2O_HEM(k); % I
-    mdot_Ox_lbh(k)  = mdot_Ox(k)*cf.kgs_to_lbmhr;
-    v_Ox_ms(k)      = line_velocity(mdot_Ox(k), rho_Ox(k+1), Di_Ox); % L
-    v_Ox_fts(k)     = v_Ox_ms(k)/cf.ft_to_m;                         % M
+    % ----- AD: Ethanol injector ΔP (Pa) -----
+    dPi_fu_Pa(k)  = max(P_i_fu_Pa(k) - ChPres_Pa(k), 0);       % AD
+    % (AE = psi conversion not explicitly stored)
 
-    % ----- AD…AR + N,O,P,R: Ethanol side mdot/velocities -----
-    dPi_fu_Pa(k)  = max(P_i_fu_Pa(k) - ChPres_Pa(k), 0); % AD uses average—keep simple
-    mdot_fu(k)    = get_ethanol_mdot_simple(Cd_i_fu, A_exit_i_fu, rho_fu(k+1), dPi_fu_Pa(k)); % N
-    mdot_fu_lbh(k)= mdot_fu(k)*cf.kgs_to_lbmhr;  % O
-    v_fu_ms(k)    = line_velocity(mdot_fu(k), rho_fu(k+1), Di_fu);   % Q
-    v_fu_fts(k)   = v_fu_ms(k)/cf.ft_to_m;                           % R
-    Q_fu_GPM(k)   = 15850.323*(mdot_fu(k)/max(rho_fu(k+1),1e-9));    % P
+    % ----- CH,CG: N2O mdot_SPI and mdot_HEM -----
+    mdot_N2O_SPI(k) = get_mass_flow_SPI_N2O( ...
+        Cd_i_N2O, A_exit_i_N2O, rho_Ox(k+1), dPi_Ox_Pa(k));    % CH
 
-    % ----- H: total mdot -----
-    mdot_sum(k) = mdot_Ox(k) + mdot_fu(k);
+    mdot_N2O_HEM(k) = get_mass_flow_HEM_N2O( ...
+        Cd_i_N2O, A_exit_i_N2O, rho_i_out_Ox(k), ...
+        H_tank_Ox(k), H_i_out_g_Ox(k));                        % CG
 
-    % ----- S,U: mass bookkeeping -----
-    m_Ox(k+1) = max(m_Ox(k) - mdot_Ox(k)*dt(k), 0);
-    m_fu(k+1) = max(m_fu(k) - mdot_fu(k)*dt(k), 0);
+    %% =====================================================================
+    %% LAYER 10–12  (I, J, K, L, M, N, O, P, Q, R, H)
+    %% N2O & ethanol mdot, velocities, flows, and total mass flow
+    %% =====================================================================
 
-    % ----- AV,AY,AU: chamber pressures (raw + corrected) -----
-    ChPres_raw_Pa(k) = get_raw_chamber_pressure_pa(cstar, mdot_sum(k), A_throat); % AV
-    if k > 2, D1(k) = get_D1_factor(RThst_N(k-1), RThst_N(k-2)); else, D1(k) = 1; end % BG
-    ChPres_Pa(k+1) = get_corrected_chamber_pressure_pa(ChPres_Pa(k), ChPres_raw_Pa(k), D1(k), 'liquid'); % AY
+    % ----- I: blended Nitrous mass flow (kg/s) -----
+    mdot_Ox(k) = (1 - 1/(1+K_blend))*mdot_N2O_SPI(k) + ...
+                 (1/(1+K_blend))*mdot_N2O_HEM(k);             % I
 
-    % ----- BA…BE: chamber/exit temps, Mach, velocity, exit P -----
-    ChTmp_K(k+1) = ChTmp_K(k); % if you have a BA rule, plug here
+    % ----- J,K,L,M: helper flows/velocities for N2O -----
+    mdot_Ox_lbh(k) = mdot_Ox(k)*cf.kgs_to_lbmhr;               % J
+    v_Ox_ms(k)     = line_velocity(mdot_Ox(k), rho_Ox(k+1), Di_Ox); % L
+    v_Ox_fts(k)    = v_Ox_ms(k)/cf.ft_to_m;                    % M
+    % Q_Ox_GPM(k) already defined earlier for dP_Cmp_Ox (acts as K)
+
+    % ----- N,O,P,Q,R: Ethanol side mdot/velocities -----
+    mdot_fu(k)     = get_ethanol_mdot_simple( ...
+                         Cd_i_fu, A_exit_i_fu, ...
+                         rho_fu(k+1), dPi_fu_Pa(k));           % N
+    mdot_fu_lbh(k) = mdot_fu(k)*cf.kgs_to_lbmhr;               % O
+    v_fu_ms(k)     = line_velocity(mdot_fu(k), rho_fu(k+1), Di_fu); % Q
+    v_fu_fts(k)    = v_fu_ms(k)/cf.ft_to_m;                    % R
+    Q_fu_GPM(k)    = 15850.323*(mdot_fu(k)/max(rho_fu(k+1),1e-9));  % P (refined)
+
+    % ----- H: total mass flow -----
+    mdot_sum(k) = mdot_Ox(k) + mdot_fu(k);                     % H
+
+    %% =====================================================================
+    %% LAYER 13  (S, U)
+    %% Mass bookkeeping for next timestep
+    %% =====================================================================
+
+    m_Ox(k+1) = max(m_Ox(k) - mdot_Ox(k)*dt(k), 0);           % S
+    m_fu(k+1) = max(m_fu(k) - mdot_fu(k)*dt(k), 0);           % U
+
+    %% =====================================================================
+    %% LAYER 14–15  (AV, AU, AX, AY, AZ, BA, BB, BC, BD, BE)
+    %% Chamber pressures and nozzle thermodynamics
+    %% =====================================================================
+
+    % ----- AV: Raw chamber pressure (Pa) -----
+    ChPres_raw_Pa(k) = get_raw_chamber_pressure_pa( ...
+                           cstar, mdot_sum(k), A_throat);      % AV
+
+    % BA: chamber temperature – here just propagated
+    ChTmp_K(k+1) = ChTmp_K(k);                                % BA (can refine later)
+
+    % BC: exit Mach number
     M_exit(k+1)  = get_exit_mach_number(M_exit_120, M_exit_125, gamma_cmb); % BC
+
+    % BB: exit gas temperature
     ExhtTmp_K(k) = get_exit_temperature(ChTmp_K(k+1), gamma_cmb, M_exit(k+1)); % BB
-    V_exit(k)    = get_exit_velocity(M_exit(k+1), gamma_cmb, R_cmb, ExhtTmp_K(k)); % BD
-    P_ratio(k)   = get_pressure_ratio_P_over_P0(gamma_cmb, M_exit(k+1)); % AZ used earlier
-    ExhtPres_Pa(k) = get_exit_pressure(ChPres_Pa(k+1), P_ratio(k)); % BE
 
-    % ----- BI…BM: thrust, rates, impulse -----
-    RThst_N(k)   = get_raw_thrust(mdot_sum(k), V_exit(k), ExhtPres_Pa(k), 101300, A_exit); % BI,BF
-    RThst_lbf(k) = convert_raw_thrust_N_to_lbf(RThst_N(k)); % BJ
-    if k > 1, dFdt(k) = get_thrust_rate(RThst_N(k), Thst_N(k-1), dt(k)); else, dFdt(k) = 0; end % BK
-    D2(k)      = get_D2_factor(dt(k), k); % BH
+    % AZ: pressure ratio P/P0
+    P_ratio(k)   = get_pressure_ratio_P_over_P0(gamma_cmb, M_exit(k+1)); % AZ
+
+    % ----- AY: corrected chamber pressure (Pa) -----
+    ChPres_Pa(k+1) = get_corrected_chamber_pressure_pa( ...
+                         ChPres_Pa(k), ChPres_raw_Pa(k), ...
+                         D1(k), 'liquid');                     % AY
+    % AX (psia) is just ChPres_Pa*Pa_to_psi when needed in lookups.
+
+    % ----- BD,BE: exit velocity and exit pressure -----
+    V_exit(k)      = get_exit_velocity(M_exit(k+1), gamma_cmb, R_cmb, ExhtTmp_K(k)); % BD
+    ExhtPres_Pa(k) = get_exit_pressure(ChPres_Pa(k+1), P_ratio(k));                  % BE
+
+    %% =====================================================================
+    %% LAYER 16–18  (BI, BJ, BK, BL, BM, BN, BO, BT, BP)
+    %% Thrust, its derivatives, impulse, mixture ratio, Δv, engine status
+    %% =====================================================================
+
+    % ----- BI,BJ: raw thrust (N, lbf) -----
+    RThst_N(k)   = get_raw_thrust( ...
+                        mdot_sum(k), V_exit(k), ...
+                        ExhtPres_Pa(k), 101300, A_exit);      % BI + BF
+    RThst_lbf(k) = convert_raw_thrust_N_to_lbf(RThst_N(k));   % BJ
+
+    % ----- BK: dF/dt (instantaneous thrust slope) -----
     if k > 1
-        Thst_N(k) = get_thrust(RThst_N(k), Thst_N(k-1), D1(k), D2(k), dFdt(k), dt(k)); % BL
+        dFdt(k) = get_thrust_rate(RThst_N(k), Thst_N(k-1), dt(k)); % BK
     else
-        Thst_N(k) = RThst_N(k);
+        dFdt(k) = 0;                                               % BK
     end
-    Thst_lbf(k) = convert_thrust_N_to_lbf(Thst_N(k)); % BM
-    J_Ns(k)     = get_impulse(Thst_N(k), dt(k));       % BN
 
-    % ----- BO,BT,BP: mixture, delta-v, engine status -----
-    OF(k)         = get_mixture_ratio(max(mdot_Ox(k),1e-12), max(mdot_fu(k),1e-12)); % BO
-    deltaV_inst(k)= get_instantaneous_deltaV(Thst_N(k), t(min(k+1,Nt)), t(k), m_Ox(k), m_fu(k)); % BT
-    status(k)     = get_engine_status(m_Ox(k+1), m_fu(k+1)); % BP
+    % ----- BL,BM: thrust (N, lbf) -----
+    if k > 1
+        Thst_N(k) = get_thrust( ...
+                        RThst_N(k), Thst_N(k-1), ...
+                        D1(k), D2(k), dFdt(k), dt(k));        % BL
+    else
+        Thst_N(k) = RThst_N(k);                               % BL
+    end
+
+    Thst_lbf(k) = convert_thrust_N_to_lbf(Thst_N(k));         % BM
+
+    % ----- BN: impulse J (N*s) -----
+    J_Ns(k) = get_impulse(Thst_N(k), dt(k));                  % BN
+
+    % ----- BO: mixture ratio O/F -----
+    OF(k) = get_mixture_ratio( ...
+               max(mdot_Ox(k),1e-12), max(mdot_fu(k),1e-12)); % BO
+
+    % ----- BT: instantaneous Δv -----
+    deltaV_inst(k) = get_instantaneous_deltaV( ...
+                        Thst_N(k), ...
+                        t(min(k+1,Nt)), t(k), ...
+                        m_Ox(k), m_fu(k));                    % BT
+
+    % ----- BP: engine status -----
+    status(k) = get_engine_status(m_Ox(k+1), m_fu(k+1));      % BP
+
 end
+
 
 %% 7) Pack outputs (names match sheet concepts)
 out.t = t; out.dt = dt;
