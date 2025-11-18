@@ -4,18 +4,20 @@ function pressuredrop = get_pressuredrop(mdot, rho, mu, K_total, tubeLength, tub
     % mu - absolute visocity of nitrous (Pa * s)
     % K_total - total K value of fittings and valves
     
-    %% Convert mdot from lb/s to kg/s
+    % Convert mdot from lb/s to kg/s
     mdot = mdot * 0.45359237; 
 
-    %% Calculate fluid velocity
-    v = (4 * mdot) / (pi * rho * D_hose^2); % m/s
-
-    %% Calculate pressure loss from pipes
     % Define Constants
     d = tubeID; % inner diameter of pipe(mm) 
     D = d / 1000; % inner diameter of pipe (m)
     L = tubeLength; % length of piping (m)
     epsilon = 0.015; % absolute roughness of stainless steel pipe (mm)
+
+
+    %% Calculate fluid velocity
+    v = (4 * mdot) / (pi * rho * D^2); % m/s
+
+    %% Calculate pressure loss from pipes
 
     % Calculate Reynolds Number
     Re = (D * v * rho) / mu;
