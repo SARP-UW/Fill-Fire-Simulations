@@ -5,7 +5,7 @@ addpath("columns_AAtoAZ/", "columns_BAtoBZ/", "columns_AtoZ/","columns_CAtoCZ/",
 %% Vector declaration
 
 % Time and Timestep (seconds)
-final_t = 15;
+final_t = 5;
 dt = 0.001; 
 N = final_t / dt + 1;
 t = zeros(1, N);
@@ -216,3 +216,6 @@ for i = 2:N-1
     raw_thrust(i) = get_raw_thrust(mdot_total(i), V_exit(i), P_exit(i), P_amb(i), A_exit);
     
 end
+
+
+plot(t(1:end-1), raw_thrust(1:end-1), t, N2O_mass, t, ethanol_mass);
