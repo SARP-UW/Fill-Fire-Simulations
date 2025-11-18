@@ -131,7 +131,7 @@ for i = 2:N-1
     P_inlet_mpa = N2O_inj_P(i) / 145; % psi to mpa because the property sheet is in metric
     rho_inlet = lookup_property("liquid_properties", P_inlet_mpa, 2, 3);
 
-
+    %test
     % Ethanol Injector
     N2O_mdot(i) = get_ethanol_mass_flow(e_Cd, e_inj_a, ethanol_density, ethanol_inj_P(i-1) - chamber_pressure(i-1));
 
