@@ -82,18 +82,19 @@ phase(1) = "liquid";
 N2O_Cd = 1.901546;
 N2O_inj_a = 1.57e-5;
 N2O_inj_P(1) = N2O_tank_pressure(1);
-N2O_mdot(1) = 0;
+N2O_mdot(1) = get_mass_flow_SPI_N2O(N2O_Cd, N2O_inj_a, N2O_tank_density(1), N2O_inj_P(1));
 
 % Ethanol-tank 
 ethanol_mass(1) = 1.6;
 n2_ullage_pressure(1) = 4385067;
 n2_ullage_volume(1) = 3.9;
+ethanol_density = 850; % (kg/m^3)
 
 % Ethanol-injector 
 e_inj_a = 0.00003418; %m^2
 e_Cd = 0.2096;
-ethanol_inj_P = zeros(1, N);
-ethanol_mdot = zeros(1, N);
+ethanol_inj_P(1) = n2_ullage_pressure(1);
+ethanol_mdot(1) = get_ethanol_mass_flow(e_Cd, e_inj_a, ethanol_density, ethanol_inj_P(1));
 
 % N2O Feed Line
 N2O_line_dP = zeros(1, N);
@@ -104,7 +105,6 @@ N2O_K_loss = 0.3562911503+0.3487562189+0.5+1;
 
 % Ethanol Feed Line
 ethanol_line_dP = zeros(1, N);
-ethanol_density = 850; % (kg/m^3)
 ethanol_line_abs_rough = 1.500124e-5; % m
 ethanol_line_length = 1.12776; % m
 ethanol_line_id = 0.007747; % m
@@ -133,7 +133,7 @@ V_exit = zeros(1, N);
 inst_delta_V = zeros(1, N);
 chamber_pressure = zeros(1, N);
 P_exit = zeros(1, N);
-mdot_total = zeros(1, N);
+mdot_total(1) = get_total_mass_flow(N2O_mdot(1), ethanol_mdot(1));
 OF_ratio = zeros(1, N);
 raw_thrust = zeros(1, N);
 thrust_Gradient = zeros(1, N);
@@ -152,13 +152,13 @@ for i = 2:N-1
     N2O_mdot(i) = get_mass_flow_SPI_N2O(N2O_Cd, N2O_inj_a, N2O_tank_density(i-1), N2O_inj_P(i-1)-chamber_pressure(i-1));
 
 
-    P_inlet_mpa = N2O_inj_P(i) / 145; % psi to mpa because the property sheet is in metric
-    rho_inlet = lookup_property("liquid_properties", P_inlet_mpa, 2, 3);
+    % P_inlet_mpa = N2O_inj_P(i) / 145; % psi to mpa because the property sheet is in metric
+    % rho_inlet = lookup_property("liquid_properties", P_inlet_mpa, 2, 3);
 
     %test
 
     % Ethanol Injector
-    N2O_mdot(i) = get_ethanol_mass_flow(e_Cd, e_inj_a, ethanol_density, ethanol_inj_P(i-1) - chamber_pressure(i-1));
+    ethanol_mdot(i) = get_ethanol_mass_flow(e_Cd, e_inj_a, ethanol_density, ethanol_inj_P(i-1) - chamber_pressure(i-1));
     
     % Nitrous Oxide Tank
     phase(i) = get_N2O_phase(N2O_mass(i-1), N2O_mdot(i-1), dt, N2O_tank_volume, N2O_tank_density(i-1), phase(i-1));
@@ -174,11 +174,14 @@ for i = 2:N-1
 
     % Nitrous Oxide Feed Line
     N2O_line_dP(i) = get_pressuredrop(N2O_mdot(i), N2O_tank_density(i), N2O_inj_a, N2O_K_loss, N2O_line_length, N2O_line_id);
+    N2O_inj_P(i) = get_N2O_injector_inlet_pressure(N2O_tank_pressure(i), N2O_line_dP(i));
 
     % Ethanol Feed Line
     ethanol_line_dP(i) = get_pressuredrop(ethanol_mdot(i), ethanol_density, ethanol_abs_visc, ethanol_K_loss, ethanol_line_length, ethanol_line_id);
+    ethanol_inj_P(i) = get_ethanol_injector_inlet_pressure(n2_ullage_pressure(i), ethanol_line_dP(i));
 
     % Thrust Chamber
+    mdot_total(i) = get_total_mass_flow(N2O_mdot(i), ethanol_mdot(i));
     raw_ch_P(i) = get_raw_chamber_pressure_pa(c_star, mdot_total(i), A_throat);
     if i > 2
         D1(i) = get_D1_factor(raw_thrust(i-1), raw_thrust(i-2));
