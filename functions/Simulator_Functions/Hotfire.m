@@ -1,4 +1,4 @@
-awefunction out = run_hotfire_from_calculations_sheet()
+function out = run_hotfire_from_calculations_sheet()
 %RUN_HOTFIRE_FROM_CALCULATIONS_SHEET
 % Drives the transient DC hotfire sim strictly in the order of the
 % "Calculations" sheet columns (C → CH), while pulling constants/props
