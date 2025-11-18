@@ -9,7 +9,8 @@ function K_total = get_K_total(all_fittings, Re, D)
     % Calculate Total K Value
     K_total = 0;
 
-    for fitting = all_fittings
+    for i = 1:numel(all_fittings)
+        fitting = all_fittings(i);
         K_total = K_total + get_K(fitting, Re, D);
     end
 
@@ -133,7 +134,7 @@ function K_fitting = get_K(fitting_type, Re, D)
             K_fitting = 1.0;
             return
         otherwise
-            error("Unknown fitting type: %s", fitting_type);
+            error("Unknown fitting type", fitting_type);
     end
 
     D_in = D * 39.37;
