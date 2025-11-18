@@ -160,7 +160,7 @@ rho_fu(1) = grab(calcT,'rho_fu_kgm3', rho_fu0);
 % Exit Mach interpolation (BC)
 M_exit(1) = get_exit_mach_number(M_exit_120, M_exit_125, gamma_cmb);
 
-%% 6) March over time, following Calculations sheet order
+%% 6) March over time, following layer order
 for k = 1:Nt-1
 
     %% =====================================================================
