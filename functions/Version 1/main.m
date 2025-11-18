@@ -180,10 +180,12 @@ for i = 2:N-1
     ethanol_mdot(i) = get_ethanol_mass_flow(e_Cd, e_inj_a, ethanol_density, ethanol_inj_P(i-1) - chamber_pressure(i-1));
     
     % Nitrous Oxide Tank
-    phase(i) = get_N2O_phase(N2O_mass(i-1), N2O_mdot(i-1), dt, N2O_tank_volume, lookup_property(N2O_tank_pressure(i-1)/1000000, 2, 3, matrix=vap_props), phase(i-1));
+% Lookup table version    phase(i) = get_N2O_phase(N2O_mass(i-1), N2O_mdot(i-1), dt, N2O_tank_volume, lookup_property(N2O_tank_pressure(i-1)/1000000, 2, 3, matrix=vap_props), phase(i-1));
+    phase(i) = get_N2O_phase(N2O_mass(i-1), N2O_mdot(i-1), dt, N2O_tank_volume, py.CoolProp.CoolProp.PropsSI('D', 'P', N2O_tank_pressure(i-1), 'Q', 1, 'NitrousOxide'), phase(i-1));
     N2O_mass(i) = get_N2O_mass(phase(i), N2O_mass(i-1), N2O_mdot(i-1), dt, N2O_tank_density(i-1), N2O_tank_volume);
     N2O_tank_pressure(i) = get_N2O_tank_pressure(phase(i), N2O_tank_pressure(i-1), dt, N2O_tank_pressure(1), N2O_mass(i-1), N2O_mass(1));
-    N2O_tank_density(i) = lookup_property(N2O_tank_pressure(i)/1000000, 2, 3, matrix=props_matrix);
+% Lookup table version    N2O_tank_density(i) = lookup_property(N2O_tank_pressure(i)/1000000, 2, 3, matrix=props_matrix);
+    N2O_tank_density(i) = py.CoolProp.CoolProp.PropsSI('D', 'P', N2O_tank_pressure(i), 'Q', 0, 'NitrousOxide');
     %N2O_tank_density_v(i) = lookup_property(N2O_tank_pressure(i)/1000000, 2, 3, matrix=vap_props);
     %N2O_int_energy(i) = lookup_property("liquid_properties", N2O_tank_pressure(i), 2, 5); % (kJ kg)
     %N2O_tank_temp(i) = lookup_property(properties_file, N2O_tank_pressure(i), 2, 1);
