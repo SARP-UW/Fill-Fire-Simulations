@@ -54,7 +54,7 @@ Ru = 8.314; % universal gas constant (J/K/mol)
 keywords_input = ["Pin =", 'O/F='," # Pressure \("];
 keywords_output = ["P, BAR", "T, K", "Cp, KJ/\(KG\)\(K\)", 'GAMMAs',"SON VEL,M/SEC","MACH NUMBER","CSTAR, M/SEC"];
 
-filetext = fileread('test2.txt');
+filetext = fileread('CEAincompletesad.txt');
 
 inputs = cell(length(keywords_input),1); 
 for i = 1:length(keywords_input) 
