@@ -1,3 +1,4 @@
+%function mdot = m_HEMc(N2O_inj_P, Cd_i, A_exit_i, rho_i_out, P_tank)
 %INPUTS: 
 %   N2O_inj_P = Injector inlet pressure (Pa)
 %   Cd_i     - discharge coefficient for HEM flow (dimensionless)
@@ -13,13 +14,14 @@
 % experimentally or analytically.
 N2O_inj_P = 5*10^6; %Pa
 P_tank = 6*10^6; %Pa
-N = 20; %number of outlet pressure range of outlet pressures
-P_chamber_range = N2O_inj_P*(linspace(0.01,0.1,N));
+N = 2000; %number of outlet pressure range of outlet pressures
+P_chamber_range = N2O_inj_P*(linspace(0.0001,0.1,N));
+%P_chamber_range = 
 Cd_i = 0.9;
 A_exit_i = 0.0001535; %m^2
 
-s_tank = lookup_property("liquid_properties", P_tank/(10^6), 2, 7); %J/kg/K
-H_tank = lookup_property("liquid_properties", P_tank/(10^6), 2, 6); %kJ/kg
+s_tank = py.CoolProp.CoolProp.PropsSI('S', 'P', P_tank, 'Q', 0, "NitrousOxide"); %J/kg/K
+H_tank = py.CoolProp.CoolProp.PropsSI('H', 'P', P_tank, 'Q', 0, "NitrousOxide"); %kJ/kg
 HEMmdots = zeros(N,1);
 
 %Find choked HEM flow rate for an inlet pressure by varying outlet pressure
@@ -27,12 +29,12 @@ HEMmdots = zeros(N,1);
         P_ch_press_temp = P_chamber_range(j);
         %Need exit density,  exit enthalpy.
 
-        rho_inj_out_liq = lookup_property("liquid_properties", P_ch_press_temp/(10^6), 2, 3);
-        rho_inj_out_vap = lookup_property("vapor_properties", P_ch_press_temp/(10^6), 2, 3);
-        h_inj_out_liq = lookup_property("liquid_properties", P_ch_press_temp/(10^6), 2, 6); %kJ/kg
-        h_inj_out_vap = lookup_property("vapor_properties", P_ch_press_temp/(10^6), 2, 6); %kJ/kg
-        s_inj_out_liq = lookup_property("liquid_properties", P_ch_press_temp/(10^6), 2, 7);%J/kg/K
-        s_inj_out_vap = lookup_property("vapor_properties", P_ch_press_temp/(10^6), 2, 7);%J/kg/K
+        rho_inj_out_liq = py.CoolProp.CoolProp.PropsSI('D', 'P', P_ch_press_temp, 'Q', 0, "NitrousOxide");
+        rho_inj_out_vap = py.CoolProp.CoolProp.PropsSI('D', 'P', P_ch_press_temp, 'Q', 1, "NitrousOxide");
+        h_inj_out_liq = py.CoolProp.CoolProp.PropsSI('H', 'P', P_ch_press_temp, 'Q', 0, "NitrousOxide"); %kJ/kg
+        h_inj_out_vap = py.CoolProp.CoolProp.PropsSI('H', 'P', P_ch_press_temp, 'Q', 1, "NitrousOxide"); %kJ/kg
+        s_inj_out_liq = py.CoolProp.CoolProp.PropsSI('S', 'P', P_ch_press_temp, 'Q', 0, "NitrousOxide");%J/kg/K
+        s_inj_out_vap = py.CoolProp.CoolProp.PropsSI('S', 'P', P_ch_press_temp, 'Q', 1, "NitrousOxide");%J/kg/K
         
         %s_tank = s_inj_outlet (assumption of isentropic flow)
         %s_inj_outlet = s_inj_out_liq*(1-x) + s_inj_out_vap*x
@@ -45,7 +47,10 @@ HEMmdots = zeros(N,1);
         
         HEMmdots(j) = get_mass_flow_HEM_N2O(Cd_i, A_exit_i, rho_i_out, H_tank, H_i_out);
     end
+
+    plot(P_chamber_range, HEMmdots);
 %Take max flow ratex
     m_dot = max(HEMmdots);
 % end
 
+%end

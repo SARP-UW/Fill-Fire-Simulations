@@ -1,4 +1,4 @@
-function mdot_flow = get_mdot_fill(P1, P2, rho, mu, mdot_prev, t)
+function mdot_flow = get_mdot_fill(P1, P2, rho, mu)
     %% Define characteristics from input sheet
     path = fullfile("..", "data", "line_properties.xlsx");
     T = readcell(path);
