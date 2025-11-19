@@ -1,7 +1,4 @@
 % Main function for running the fill sim
-
-
-
 this_file = mfilename('fullpath');
 this_folder = fileparts(this_file);
 main_folder = fileparts(this_folder);
@@ -52,8 +49,8 @@ T_run_tank(1) = f_to_k(inputs.VALUE(strcmp(inputs.PARAMETER, "Initial Bottle Tem
 T_bottle(1) = f_to_k(inputs.VALUE(strcmp(inputs.PARAMETER, "Initial Bottle Temperature (F)")));
 T_aluminum(1) = T_run_tank(1);
 T_amb = f_to_k(inputs.VALUE(strcmp(inputs.PARAMETER, "Initial Bottle Temperature (F)")));
-wind_speed = ;
-solar_zenith = ;
+wind_speed = 20;
+solar_zenith = 0;
 
 % Import variables from the excel input sheet
 orifice_diameter = inputs.VALUE(strcmp(inputs.PARAMETER, "Tank Orifice Diameter (in)"));
@@ -63,11 +60,11 @@ vol_run_tank = cf.ft3_to_m3 * inputs.VALUE(strcmp(inputs.PARAMETER, "Run Tank Vo
 
 % Initialize bottle properties
 m_bottle(1) = cf.lb_to_kg * inputs.VALUE(strcmp(inputs.PARAMETER, "Initial N2O Mass (lb)"));
-v_bottle(1) = vol_bottom / m_bottle(1);
+v_bottle(1) = vol_bottle / m_bottle(1);
 x_bottle(1) = get_quality(T_bottle(1), "Volume_m3_kg", v_bottle(1) * cf.ft3lb_to_m3kg);
 u_bottle(1) = get_state_variable(T_bottle(1), x_bottle(1), "Internal_Energy_kJ_kg");
 U_tot_bottle(1) = u_bottle(1) * m_bottle(1);
-h_bottle(1) = get_state_variable(T_bottle(1), x_bottle(1), "Enthalpy_kJ_kg");
+h_bottle(1) = get_state_variable(T_bottle(1), x_bottle(1), "Enthalpy_kJ__kg");
 P_bottle(1) = get_state_variable(T_bottle(1), x_bottle(1), "Pressure_Mpa") * cf.mpa_to_psi;
 q_bottle(1) = 0; % assuming no heat transfer FOR NOW
 
@@ -79,7 +76,7 @@ v_run_tank(1) = get_state_variable(T_bottle(1), x, "Volume_m3_kg") / cf.ft3lb_to
 m_run_tank(1) = vol_run_tank / v_run_tank(1);
 u_run_tank(1) = get_state_variable(T_bottle(1), x, "Internal_Energy_kJ_kg");
 U_tot_run_tank(1) = u_run_tank(1) * m_run_tank(1);
-h_run_tank(1) = get_state_variable(T_bottle(1), x, "Enthalpy_kJ_kg");
+h_run_tank(1) = get_state_variable(T_bottle(1), x, "Enthalpy_kJ__kg");
 mu_run_tank(1) = get_state_variable(T_bottle(1), 1, "Viscosity_uPa_s");
 
 
@@ -87,7 +84,7 @@ for n = 2:length(t)-1
     % Calculate m_dot out of the run tank
     [m_dot_run_tank_out(n), fill_time] = get_mdot_tank_orifice(P_run_tank(n - 1), orifice_diameter, cyl_diameter);
 
-    % Mass flow into run tank (assume only liquid flow)
+    % Mass flow into run tank
     v_f_bottle(n) = 1 / get_state_variable(T_bottle(n-1), f, "Density_kg_m3");
     mu_bottle(n) = get_state_variable(T_bottle(n-1), f, "Viscosity_uPa_s");
 
@@ -102,31 +99,31 @@ for n = 2:length(t)-1
     m_run_tank(n) = m_run_tank(n-1) + (m_dot_run_tank_in(n) - m_dot_run_tank_out(n))*dt;
     v_run_tank(n) = vol_run_tank / m_run_tank(n);
 
-    % Find energy in run tank
+    % New energy in run tank
     dU_run_tank = ( (m_dot_run_tank_in(n) * h_bottle(n-1)) - (m_dot_run_tank_out(n) * h_run_tank(n-1)) +  q_run_tank(n) ) * dt;
     U_tot_run_tank(n) = U_tot_run_tank(n-1) + dU_run_tank;
     u_run_tank(n) = U_tot_run_tank(n) / m_run_tank(n);
     
-    % Get new state in run tank
+    % New state in run tank
     [T_run_tank(n), x_run_tank(n)] = state_density(1 / v_run_tank(n), u_run_tank(n), T_run_tank(n-1));
     P_run_tank(n) = get_state_variable(T_run_tank(n), x_run_tank(n), "Pressure_Mpa");
-    h_run_tank(n) = get_state_variable(T_run_tank(n), x_run_tank(n), "Enthalpy_kJ/_kg");
+    h_run_tank(n) = get_state_variable(T_run_tank(n), x_run_tank(n), "Enthalpy_kJ__kg");
     v_f_run_tank(n) = get_state_variable(T_run_tank(n), f, "Volume_m3_kg");
     v_g_run_tank(n) = get_state_variable(T_run_tank(n), g, "Volume_m3_kg");
     mu_run_tank(n) = get_state_variable(T_run_tank(n), x_run_tank(n), "Viscosity_uPa_s");
 
-    % Get new energy in bottle
+    % New energy in bottle
     m_bottle(n) = m_bottle(n-1) - (m_dot_run_tank_in(n) * dt);
     q_bottle(n) = q_bottle(n-1); % assume doesn't change from 0
     dU_bottle = ( q_bottle(n) - (m_dot_run_tank_in(n) * h_bottle(n-1)) ) * dt;
     U_tot_bottle(n) = U_tot_bottle(n-1) + dU_bottle;
     u_bottle(n) = U_tot_bottle(n) / m_bottle(n);
 
-    % Get new state in bottle
+    % New state in bottle
     v_bottle(n) = vol_bottle / m_bottle(n);
     [T_bottle(n), x_bottle(n)] = state_density(1 / v_bottle(n), u_bottle(n), T_bottle(n-1));
     P_bottle(n) = get_state_variable(T_bottle(n), x_bottle(n), "Pressure_Mpa");
-    h_bottle(n) = get_state_variable(T_bottle(n), x_bottle(n), "Enthalpy_kJ/_kg");
+    h_bottle(n) = get_state_variable(T_bottle(n), x_bottle(n), "Enthalpy_kJ__kg");
     v_f_bottle(n) = get_state_variable(T_bottle(n), f, "Volume_m3_kg");
     v_g_bottle(n) = get_state_variable(T_bottle(n), g, "Volume_m3_kg");
     mu_bottle(n) = get_state_variable(T_bottle(n), x_bottle(n), "Viscosity_uPa_s");
