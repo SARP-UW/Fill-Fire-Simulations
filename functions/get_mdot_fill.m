@@ -1,6 +1,7 @@
 function mdot_flow = get_mdot_fill(P1, P2, rho, mu, mdot_prev, t)
     %% Define characteristics from input sheet
-    T = readcell('line_properties.xlsx');
+    path = fullfile("..", "data", "line_properties.xlsx");
+    T = readcell(path);
     
     L = [T{4,2}, T{9,2}, T{13,2}];
     L = L ./ 3.281; % Length of tubings (m)
@@ -9,24 +10,21 @@ function mdot_flow = get_mdot_fill(P1, P2, rho, mu, mdot_prev, t)
     epsilon = [T{6,2}, T{11,2}, T{15,2}]; % Absolute roughness of pipes (mm)
     Cv = T{7,2}; % K-bottle flow coefficient
 
-    rf_fittings = T{3:end, 3}; % String array of all fittings on the RF stand
-
-
+    rf_fittings = string(T(3:end, 3)); % String array of all fittings on the RF stand
+    rf_fittings = rf_fittings(~ismissing(rf_fittings));
+    rf_fittings = rf_fittings(:);
+    
     %% Calculate mdot
     deltaP = P1 - P2;
 
-    if t == 0
-        v_guess = T{3,5}; % Initial velocity guess
-    else
-        v_guess = (4 * mdot_prev) / (rho * pi * D(1)^2); % Get velocity from previous timestep
-    end
+    diff = @(v) deltaP - guess_deltaP(max(v, 1e-6), rho, mu, L, D, epsilon, Cv, rf_fittings);
 
-    diff = @(v) deltaP - guess_deltaP(v, rho, mu, L, D, epsilon, Cv, rf_fittings);
+    vmin = 0.001;
+    vmax = 50;
 
-    v_actual = fzero(diff, v_guess);
+    v_actual = fzero(diff, [vmin, vmax]);
 
     mdot_flow = v_actual * rho * pi * D(1) ^ 2 / 4;
-
 end
 
 function guess = guess_deltaP(v_guess, rho, mu, L, D, epsilon, Cv, rf_fittings)
@@ -37,7 +35,8 @@ function guess = guess_deltaP(v_guess, rho, mu, L, D, epsilon, Cv, rf_fittings)
     Re_1 = (D(1) * v_1 * rho) / mu;
     f_1 = get_friction_factor(D(1), epsilon(1), Re_1);
 
-    K_1 = 2.148 * (10 ^ 9) * (D(1) ^ 4) / (Cv ^ 2); % Convert Cv to a resistance coefficient K
+    d_mm = D(1) * 1000;
+    K_1 = 2.148 * (10 ^ -3) * (d_mm ^ 4) / (Cv ^ 2); % Convert Cv to a resistance coefficient K
     
     deltaP_1 = ( (rho * v_1^2) / 2) * ( (f_1 * L(1) / D(1)) + K_1);
  
