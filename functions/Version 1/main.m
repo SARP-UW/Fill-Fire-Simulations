@@ -163,8 +163,14 @@ for i = 2:N-1
 
     % P_inlet_mpa = N2O_inj_P(i) / 145; % psi to mpa because the property sheet is in metric
     % rho_inlet = lookup_property(properties_file, P_inlet_mpa, 2, 3);
+    % if i < 10
+    %     N2O_mdot(i) = get_mass_flow_SPI_N2O(N2O_Cd, N2O_inj_a, N2O_tank_density(i-1), N2O_inj_P(i-1)-chamber_pressure(i-1)) * i / 10;
+    % else
+    %     N2O_mdot(i) = get_mass_flow_SPI_N2O(N2O_Cd, N2O_inj_a, N2O_tank_density(i-1), N2O_inj_P(i-1)-chamber_pressure(i-1));
+    % end
+
     if i < 10
-        N2O_mdot(i) = get_mass_flow_SPI_N2O(N2O_Cd, N2O_inj_a, N2O_tank_density(i-1), N2O_inj_P(i-1)-chamber_pressure(i-1)) * i / 10;
+        N2O_mdot(i) = m_FML() * i / 10;
     else
         N2O_mdot(i) = get_mass_flow_SPI_N2O(N2O_Cd, N2O_inj_a, N2O_tank_density(i-1), N2O_inj_P(i-1)-chamber_pressure(i-1));
     end
@@ -224,4 +230,5 @@ for i = 2:N-1
 end
 
 
-plot(t(1:end-1), raw_thrust(1:end-1), t, N2O_mass, t, ethanol_mass);
+%plot(t(1:end-1), raw_thrust(1:end-1), t, N2O_mass, t, ethanol_mass);
+plot(t, chamber_pressure);
