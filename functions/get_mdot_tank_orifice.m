@@ -1,4 +1,4 @@
-function [m_dot, Fill_Time] = get_mdot_tank_orifice(pressure_tank, orifice_diameter, cylinder_diam)
+function [m_dot, Fill_Time] = get_mdot_tank_orifice(pressure_tank, orifice_diameter, cylinder_diam, density_tank)
 % This function calculates the mass flow rate of the nitrous filling process
 % and the total time it takes to fill.
 
@@ -14,6 +14,7 @@ arguments (Input)
     pressure_tank (1,1) double{mustBeReal, mustBeFinite, mustBePositive} %psi
     orifice_diameter (1,1) double{mustBeReal, mustBeFinite, mustBePositive} % in
     cylinder_diam (1,1) double{mustBeReal, mustBeFinite, mustBePositive} % In
+    density_tank (1,1) double{mustBeReal, mustBeFinite, mustBePositive} % kg/m3
 end
 
 arguments (Output)
@@ -21,16 +22,23 @@ arguments (Output)
     Fill_Time (1,1) double{mustBeReal, mustBeFinite, mustBePositive} % s
 end 
 
+this_file = mfilename('fullpath');
+this_folder = fileparts(this_file);
+main_folder = fileparts(this_folder);
+addpath(fullfile(main_folder, 'functions'));
+cf = c();
+
 % Constants
 P_Initial = 14.7; %psi
-Molar_Density_Initial = 27.958; % mol/l^3
+% Molar_Density_Initial = 27.958; % mol/l^3
 k = 1.27; % Specific heat ratio
 Cd = 0.8; % Discharge coefficient for orfices and nozzles 
 g = 32.174; % ft/s^2
 Vol_Tank = 0.3266606672; %from thrust simulation
 
 % Calculations
-density_initial = Molar_Density_Initial * (44.013)/(453.592*0.035315);
+% density_initial = Molar_Density_Initial * (44.013)/(453.592*0.035315);
+density_initial = density_tank * cf.ft3_to_m3 / (cf.lb_to_kg);
 % density (lb/ft^3) = Molar_Desnity (mol/L) * (453.592 g / mol) * (1 lb / 453.592 g) * (1 L / 0.035315 ft^3) 
 Beta = orifice_diameter/cylinder_diam;
 % diameter ratios

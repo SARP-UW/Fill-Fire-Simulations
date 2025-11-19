@@ -43,6 +43,9 @@ function [t, x] = state_density(density_new, energy_old, temperature_old)
     % Ensure that the initial difference is positive in order to ensure the
     % solver is working properly
     if difference_old < 0
+        disp(energy_old)
+        disp(density_new)
+        disp(temperature_old)
         error("Thermo solver failed: Initial iteration not negative")
     end
 
