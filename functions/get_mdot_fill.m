@@ -26,7 +26,7 @@ function mdot_flow = get_mdot_fill(P1, P2, rho, mu)
     diff = @(v) deltaP - guess_deltaP(max(v, 1e-6), rho, mu, L, D, epsilon, Cv, rf_fittings);
 
     vmin = 0.001;
-    vmax = 100;
+    vmax = 50;
     
     v_actual = fzero(diff, [vmin, vmax]);
 
