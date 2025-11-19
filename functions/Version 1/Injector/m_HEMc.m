@@ -53,14 +53,9 @@ HEMmdots = zeros(1, N);
         % 
         % rho_i_out = rho_inj_out_liq*(1-x_inj_out) + rho_inj_out_vap*(x_inj_out);
         % H_i_out = h_inj_out_liq*(1-x_inj_out) + h_inj_out_vap*(x_inj_out);
-        
-        if phase == 'liquid'
-            H_i_out = py.CoolProp.CoolProp.PropsSI("H", "P|liquid", P_ch_press_temp, "S", s_tank, "NitrousOxide");
-            rho_i_out = py.CoolProp.CoolProp.PropsSI("D", "P|liquid", P_ch_press_temp, "S", s_tank, "NitrousOxide");
-        else
-            H_i_out = py.CoolProp.CoolProp.PropsSI("H", "P|gas", P_ch_press_temp, "S", s_tank, "NitrousOxide");
-            rho_i_out = py.CoolProp.CoolProp.PropsSI("D", "P|gas", P_ch_press_temp, "S", s_tank, "NitrousOxide");
-        end
+
+        H_i_out = py.CoolProp.CoolProp.PropsSI("H", "P", P_ch_press_temp, "S", s_tank, "NitrousOxide");
+        rho_i_out = py.CoolProp.CoolProp.PropsSI("D", "P", P_ch_press_temp, "S", s_tank, "NitrousOxide");
 
         HEMmdots(j) = get_mass_flow_HEM_N2O(Cd_i, A_exit_i, rho_i_out, H_tank, H_i_out);
     end
