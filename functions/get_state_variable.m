@@ -13,6 +13,7 @@ function output = get_state_variable(t, phase, variable)
     row_vapor2 = vapor_properties_table(idx, :);
     row_liquid1 = liquid_properties_table(idx - 1, :);
     row_vapor1 = vapor_properties_table(idx - 1, :);
+    phase = string(phase);
 
     if (phase == "g")
         delta_t = row_vapor2.Temperature_K - row_vapor1.Temperature_K;
@@ -23,6 +24,7 @@ function output = get_state_variable(t, phase, variable)
         delta_variable = row_liquid2.(variable) - row_liquid1.(variable);
         output = row_liquid1.(variable) + (t - row_liquid1.Temperature_K) * delta_variable / delta_t;
     else 
+        phase = double(phase);
         delta_t = row_liquid2.Temperature_K - row_liquid1.Temperature_K;
         delta_variable_liquid = row_liquid2.(variable) - row_liquid1.(variable);
         delta_variable_vapor = row_vapor2.(variable) - row_vapor1.(variable);
