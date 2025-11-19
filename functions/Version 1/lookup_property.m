@@ -1,17 +1,30 @@
-function property = lookup_property(file, base_val, base_col, search_col)
+function property = lookup_property(base_val, base_col, search_col, options)
     % Lookup function that finds the corresponding property in a certain
     % column based on a known value, search column, and result column.
 
     % The file must be organized into column categories and rows for
     % different values. See "liquid_properties.xlsx" for an example.
 
+    arguments
+        base_val double;
+        base_col double;
+        search_col double;
+        options.file string = "";
+        options.matrix double = 0;
+    end
+
     % Matrix Setup
-    t = readmatrix(sprintf("%s.xlsx", file));
+    if options.matrix == 0
+        t = readmatrix(sprintf("%s.xlsx", options.file));
+        
+    else
+        t = options.matrix;
+    end
     t_size = size(t);
     index = 0;
     
     % Isentropic Relations fix, not great but works for now
-    if file == "isentropic_relations"
+    if options.file == "isentropic_relations"
         t(1, :) = [];
     end
 

@@ -17,6 +17,6 @@
 %   P_i_Ox - injector inlet pressure (psia)
 
 function P_i_Ox = get_N2O_injector_inlet_pressure(P_T_Ox, dP_sum_Ox)
-    adj_factor = 20;
-    P_i_Ox = P_T_Ox - dP_sum_Ox + adj_factor;
+    %adj_factor = 20;
+    P_i_Ox = P_T_Ox - dP_sum_Ox;
 end

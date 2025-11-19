@@ -1,15 +1,15 @@
 function pressuredrop = get_pressuredrop(mdot, rho, mu, K_total, tubeLength, tubeID)
-    % mdot - mass flow rate of nitrous (lb/s)
+    % mdot - mass flow rate of nitrous (kg/s)
     % rho - density of nitrous (kg/m^3)
     % mu - absolute visocity of nitrous (Pa * s)
     % K_total - total K value of fittings and valves
     
     % Convert mdot from lb/s to kg/s
-    mdot = mdot * 0.45359237; 
+    %mdot = mdot * 0.45359237; 
 
     % Define Constants
-    d = tubeID; % inner diameter of pipe(mm) 
-    D = d / 1000; % inner diameter of pipe (m)
+    d = tubeID/1000; % inner diameter of pipe(mm) 
+    D = tubeID; % inner diameter of pipe (m)
     L = tubeLength; % length of piping (m)
     epsilon = 0.015; % absolute roughness of stainless steel pipe (mm)
 

@@ -1,4 +1,4 @@
-addpath("columns_AAtoAZ/", "columns_BAtoBZ/", "columns_AtoZ/","columns_CAtoCZ/","data/");
+addpath("columns_AAtoAZ/", "columns_BAtoBZ/", "columns_AtoZ/","columns_CAtoCZ/","data/", "Injector/");
 
 % This is the main function for Version 1 of the engine simulation.
 
@@ -185,7 +185,11 @@ for i = 2:N-1
     N2O_mass(i) = get_N2O_mass(phase(i), N2O_mass(i-1), N2O_mdot(i-1), dt, N2O_tank_density(i-1), N2O_tank_volume);
     N2O_tank_pressure(i) = get_N2O_tank_pressure(phase(i), N2O_tank_pressure(i-1), dt, N2O_tank_pressure(1), N2O_mass(i-1), N2O_mass(1));
 % Lookup table version    N2O_tank_density(i) = lookup_property(N2O_tank_pressure(i)/1000000, 2, 3, matrix=props_matrix);
-    N2O_tank_density(i) = py.CoolProp.CoolProp.PropsSI('D', 'P', N2O_tank_pressure(i), 'Q', 0, 'NitrousOxide');
+    if phase(i) == "liquid"
+        N2O_tank_density(i) = py.CoolProp.CoolProp.PropsSI('D', 'P', N2O_tank_pressure(i), 'Q', 0, 'NitrousOxide');
+    else
+        N2O_tank_density(i) = py.CoolProp.CoolProp.PropsSI('D', 'P', N2O_tank_pressure(i), 'Q', 1, 'NitrousOxide');
+    end
     %N2O_tank_density_v(i) = lookup_property(N2O_tank_pressure(i)/1000000, 2, 3, matrix=vap_props);
     %N2O_int_energy(i) = lookup_property("liquid_properties", N2O_tank_pressure(i), 2, 5); % (kJ kg)
     %N2O_tank_temp(i) = lookup_property(properties_file, N2O_tank_pressure(i), 2, 1);

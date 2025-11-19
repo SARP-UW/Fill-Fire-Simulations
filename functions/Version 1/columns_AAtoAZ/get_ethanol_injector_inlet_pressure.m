@@ -1,8 +1,5 @@
-HEAD
-%% Calculates Ethanol injector inlet pressure ( psia)
-
 %% Calculates Ethanol injector inlet pressure (psia)
-067c58d97c8f3388ff3272b7c908a38adbb3d7b8
+
 % View full documentation here: https://www.overleaf.com/read/yzpnyzrksypj#0a7d39
 %
 % Syntax:
