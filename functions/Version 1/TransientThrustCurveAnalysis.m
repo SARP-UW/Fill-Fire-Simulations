@@ -25,8 +25,10 @@ function [P_c_new,F_new] = TransientThrustCurveAnalysis(calibration_data,P_c_sim
     elseif of_sim > of(end)
         of_index = length(of);
         fprintf('warning! of is higher than data range!')
-    else
-        of_index = round( interp1( of(1,1:end), 1:numel(of(1,1:end)), round( of_sim, 1) ), 0 );
+     else
+        of_index = interp1( of(1,1:end), 1:numel(of(1,1:end)), round( of_sim, 1) );
+        % of_index_l = floor( interp1( of(1,1:end), 1:numel(of(1,1:end)), round( of_sim, 1) ), 0 );
+        % of_index_u = round( interp1( of(1,1:end), 1:numel(of(1,1:end)), round( of_sim, 1) ), 0 );
     end
     
     if P_c_sim < data.P_c(1)
@@ -36,14 +38,17 @@ function [P_c_new,F_new] = TransientThrustCurveAnalysis(calibration_data,P_c_sim
         P_c_index = length(P_c);
         fprintf('warning! pressure is higher than data range!')
     else
-        P_c_index = round( interp1( P_c(1:end,1).', 1:numel(P_c(1:end,1)), round( P_c_sim, 1) ) );
+        P_c_index = interp1( P_c(1:end,1).', 1:numel(P_c(1:end,1)), round( P_c_sim, 1) );
+        % P_c_index_l = floor( interp1( P_c(1:end,1).', 1:numel(P_c(1:end,1)), round( P_c_sim, 1) ) );
+        % P_c_index_u = round( interp1( P_c(1:end,1).', 1:numel(P_c(1:end,1)), round( P_c_sim, 1) ) );
     end
-    c_star_sim = c_star(P_c_index,of_index);
+    
+    c_star_sim = interp2(c_star, of_index, P_c_index, 'linear');
     P_c_new = c_star_sim * m_dot / A_t;
     
-    M_e_sim = M_e( P_c_index, of_index );
-    a_e_sim = a_e( P_c_index, of_index );
-    P_e_sim = P_e( P_c_index, of_index );
+    M_e_sim = interp2(M_e, of_index, P_c_index, 'linear' );
+    a_e_sim = interp2(a_e, of_index, P_c_index, 'linear' );
+    P_e_sim = interp2(P_e, of_index, P_c_index, 'linear' );
     
     v_e_sim = M_e_sim.*a_e_sim;
     F_new = m_dot.*v_e_sim + (P_e_sim - P_0)*A_e;
