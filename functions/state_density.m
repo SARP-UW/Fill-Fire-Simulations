@@ -3,12 +3,14 @@
 %temperature_old: K
 
 function [t, x] = state_density(density_new, energy_old, temperature_old)
+    
     % Get path to the data folder and access to the vapor and liquid property excel tables 
     this_file = mfilename('fullpath');
     this_folder = fileparts(this_file);
     main_folder = fileparts(this_folder);
     liquid_properties_table = readtable(fullfile(main_folder, 'data', 'liquid_properties.xlsx'));
     vapor_properties_table = readtable(fullfile(main_folder, 'data', 'vapor_properties.xlsx'));
+    addpath(fullfile(main_folder, 'functions'));
 
     % Get initial index to track the row in the excel tables that
     % corresponds to the old temperature
@@ -39,17 +41,30 @@ function [t, x] = state_density(density_new, energy_old, temperature_old)
     % Initialize return variables
     final_t = temperature_old;
     final_x = x;
+    
+    modifier = 1;
 
     % Ensure that the initial difference is positive in order to ensure the
     % solver is working properly
     if difference_old < 0
-        disp(energy_old)
-        disp(density_new)
-        disp(temperature_old)
-        error("Thermo solver failed: Initial iteration not negative")
-    end
+        disp(difference_old)
+        disp("Thermo solver failed maybe: Initial iteration is negative")
+        closest_row_liquid2 = liquid_properties_table(idx + 1, :);
+        closest_row_vapor2 = vapor_properties_table(idx + 1, :);
+        v_f2 = 1 / closest_row_liquid2.Density_kg_m3;
+        v_g2 = 1 / closest_row_vapor2.Density_kg_m3;
+        u_f2 = closest_row_liquid2.Internal_Energy_kJ_kg;
+        u_g2 = closest_row_vapor2.Internal_Energy_kJ_kg;
+        difference_2 = (v_t - v_f2)/(v_g2 - v_f2) - (u_t - u_f2)/(u_g2 - u_f2);
+        disp(difference_2)
+        keep_iterating = false;
+        final_x = (v_t - v_f2)/(v_g2 - v_f2);
 
+    end
+    count = 0;
     while keep_iterating
+
+        count = count + 1;
         % Drop the temperature one row on the property tables
         idx = idx - 1;
         closest_row_liquid = liquid_properties_table(idx, :);
@@ -63,16 +78,20 @@ function [t, x] = state_density(density_new, energy_old, temperature_old)
         
         % Calculate difference for solver
         difference = (v_t - v_f)/(v_g - v_f) - (u_t - u_f)/(u_g - u_f);
+        disp(difference)
         final_x = ((v_t - v_f)/(v_g - v_f) + (u_t - u_f)/(u_g - u_f)) / 2;
         t = closest_row_liquid.Temperature_K;
 
         % If the difference now flips to negative, compute the temperature
         % using the old difference
-        if difference < 0
+        if difference < 0 && modifier == 1
             total_difference = difference_old - difference;
             delta_t = t - t_old;
             final_t = t + (difference/total_difference) * (delta_t);
             keep_iterating = false;
+            disp(count)
+        elseif difference > 0 && modifier == -1
+
         end
 
         difference_old = difference;

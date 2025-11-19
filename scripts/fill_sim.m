@@ -61,7 +61,7 @@ vol_run_tank = cf.ft3_to_m3 * inputs.VALUE(strcmp(inputs.PARAMETER, "Run Tank Vo
 % Initialize bottle properties
 m_bottle(1) = cf.lb_to_kg * inputs.VALUE(strcmp(inputs.PARAMETER, "Initial N2O Mass (lb)"));
 v_bottle(1) = vol_bottle / m_bottle(1);
-x_bottle(1) = get_quality(T_bottle(1), "Volume_m3_kg", v_bottle(1) * cf.ft3lb_to_m3kg);
+x_bottle(1) = get_quality(T_bottle(1), "Volume_m3_kg", v_bottle(1));
 u_bottle(1) = get_state_variable(T_bottle(1), x_bottle(1), "Internal_Energy_kJ_kg");
 U_tot_bottle(1) = u_bottle(1) * m_bottle(1);
 h_bottle(1) = get_state_variable(T_bottle(1), x_bottle(1), "Enthalpy_kJ__kg");
@@ -128,6 +128,7 @@ for n = 2:length(t)-1
     v_f_run_tank(n) = get_state_variable(T_run_tank(n), "f", "Volume_m3_kg");
     v_g_run_tank(n) = get_state_variable(T_run_tank(n), "g", "Volume_m3_kg");
     mu_run_tank(n) = get_state_variable(T_run_tank(n), x_run_tank(n), "Viscosity_uPa_s");
+    disp("Made it through december")
 
     % New energy in bottle
     m_bottle(n) = m_bottle(n-1) - (m_dot_run_tank_in(n) * dt);
@@ -140,7 +141,11 @@ for n = 2:length(t)-1
     v_bottle(n) = vol_bottle / m_bottle(n);
     fprintf("v(n) is %f\n", v_bottle(n))
     fprintf("v(n-1) is %f\n", v_bottle(n-1))
+    fprintf("u(n) is %f\n", u_bottle(n))
+    fprintf("u(n-1) is %f\n", u_bottle(n-1))
     [T_bottle(n), x_bottle(n)] = state_density(1 / v_bottle(n), u_bottle(n), T_bottle(n-1));
+    fprintf("x(n) is %f\n", T_bottle(n))
+    fprintf("x(n-1) is %f\n", T_bottle(n-1))
     P_bottle(n) = get_state_variable(T_bottle(n), x_bottle(n), "Pressure_Mpa");
     h_f_bottle(n) = get_state_variable(T_bottle(n), "f", "Enthalpy_kJ__kg");
     v_f_bottle(n) = get_state_variable(T_bottle(n), "f", "Volume_m3_kg");
