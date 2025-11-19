@@ -5,8 +5,8 @@ addpath("columns_AAtoAZ/", "columns_BAtoBZ/", "columns_AtoZ/","columns_CAtoCZ/",
 %% Vector declaration
 
 % Time and Timestep (seconds)
-final_t = 5;
-dt = 0.001; 
+final_t = 4;
+dt = 0.01; 
 N = final_t / dt + 1;
 t = zeros(1, N);
 
@@ -86,9 +86,9 @@ N2O_inj_P(1) = N2O_tank_pressure(1);
 N2O_mdot(1) = get_mass_flow_SPI_N2O(N2O_Cd, N2O_inj_a, N2O_tank_density(1), N2O_inj_P(1)) * 0.1;
 
 % Ethanol-tank 
-ethanol_mass(1) = 1.6;
-n2_ullage_pressure(1) = 4385067;
-n2_ullage_volume(1) = 3.9;
+ethanol_mass(1) = 1.6; % (kg)
+n2_ullage_pressure(1) = 4385067; % (Pa)
+n2_ullage_volume(1) = 3.9 / 1000; % (m^3)
 ethanol_density = 850; % (kg/m^3)
 
 % Ethanol-injector 
@@ -155,6 +155,7 @@ props_matrix = liq_props;
 for i = 2:N-1
     t(i) = t(i-1)+dt;
     
+    phase(i) = get_N2O_phase(N2O_mass(i-1), N2O_mdot(i-1), dt, N2O_tank_volume, py.CoolProp.CoolProp.PropsSI('D', 'P', N2O_tank_pressure(i-1), 'Q', 1, 'NitrousOxide'), phase(i-1));
     if phase(i) == "vapor" && phase(i-1) == "liquid"
         props_matrix = vap_props;
     end
@@ -170,9 +171,9 @@ for i = 2:N-1
     % end
 
     if i < 10
-        N2O_mdot(i) = m_FML() * i / 10;
+        N2O_mdot(i) = m_FML(m_SPC(N2O_Cd, N2O_inj_a, N2O_inj_P(i-1), chamber_pressure(i-1), phase(i)), m_HEMc(N2O_inj_P(i-1), N2O_Cd, N2O_inj_a, phase(i)), chamber_pressure(i-1), N2O_inj_P(i-1), phase(i)) * i / 10;
     else
-        N2O_mdot(i) = get_mass_flow_SPI_N2O(N2O_Cd, N2O_inj_a, N2O_tank_density(i-1), N2O_inj_P(i-1)-chamber_pressure(i-1));
+        N2O_mdot(i) = m_FML(m_SPC(N2O_Cd, N2O_inj_a, N2O_inj_P(i-1), chamber_pressure(i-1), phase(i)), m_HEMc(N2O_inj_P(i-1), N2O_Cd, N2O_inj_a, phase(i)), chamber_pressure(i-1), N2O_inj_P(i-1), phase(i));
     end
 
 
@@ -185,10 +186,18 @@ for i = 2:N-1
     % Startup
     ethanol_mdot(i) = get_ethanol_mass_flow(e_Cd, e_inj_a, ethanol_density, ethanol_inj_P(i-1) - chamber_pressure(i-1));
     
+    if ethanol_mass(i) < 0
+        ethanol_mdot(i) = 0;
+    end
+    if N2O_mass(i) < 0
+        N2O_mdot(i) = 0;
+    end
     % Nitrous Oxide Tank
 % Lookup table version    phase(i) = get_N2O_phase(N2O_mass(i-1), N2O_mdot(i-1), dt, N2O_tank_volume, lookup_property(N2O_tank_pressure(i-1)/1000000, 2, 3, matrix=vap_props), phase(i-1));
-    phase(i) = get_N2O_phase(N2O_mass(i-1), N2O_mdot(i-1), dt, N2O_tank_volume, py.CoolProp.CoolProp.PropsSI('D', 'P', N2O_tank_pressure(i-1), 'Q', 1, 'NitrousOxide'), phase(i-1));
     N2O_mass(i) = get_N2O_mass(phase(i), N2O_mass(i-1), N2O_mdot(i-1), dt, N2O_tank_density(i-1), N2O_tank_volume);
+    if N2O_mass(i) < 0
+        N2O_mass(i) = 0;
+    end
     N2O_tank_pressure(i) = get_N2O_tank_pressure(phase(i), N2O_tank_pressure(i-1), dt, N2O_tank_pressure(1), N2O_mass(i-1), N2O_mass(1));
 % Lookup table version    N2O_tank_density(i) = lookup_property(N2O_tank_pressure(i)/1000000, 2, 3, matrix=props_matrix);
     if phase(i) == "liquid"
@@ -202,7 +211,10 @@ for i = 2:N-1
 
     % Ethanol Tank
     ethanol_mass(i) = get_ethanol_mass(ethanol_mass(i-1), ethanol_mdot(i-1), dt);
-    n2_ullage_volume(i) = get_ullage_volume(n2_ullage_volume(i-1), dt, ethanol_density);
+    if ethanol_mass(i) < 0
+        ethanol_mass(i) = 0;
+    end
+    n2_ullage_volume(i) = n2_ullage_volume(i-1) + ethanol_mdot(i) / ethanol_density * dt;
     n2_ullage_pressure(i) = get_ethanol_tank_pressure(n2_ullage_pressure(i-1), n2_ullage_volume(i-1), n2_ullage_volume(i));
 
     % Nitrous Oxide Feed Line
@@ -230,5 +242,5 @@ for i = 2:N-1
 end
 
 
-%plot(t(1:end-1), raw_thrust(1:end-1), t, N2O_mass, t, ethanol_mass);
-plot(t, chamber_pressure);
+plot(t(1:end-1), raw_thrust(1:end-1), t, N2O_mass, t, ethanol_mass);
+%plot(t, chamber_pressure);

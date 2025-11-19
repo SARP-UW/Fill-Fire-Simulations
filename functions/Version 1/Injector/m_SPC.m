@@ -1,10 +1,18 @@
-function m_dot = m_SPC(Cd_i_SPC,A_inj_N2O,P_inj_inlet, P_chamber)
+function m_dot = m_SPC(Cd_i_SPC,A_inj_N2O,P_inj_inlet, P_chamber, phase)
     % Cd_i_SPC = 0.9;
     % A_inj_N2O = 0.0001535;
     % P_inj_inlet = 5e6;
     % P_chamber = 4.137e6;
-    cp = py.CoolProp.CoolProp.PropsSI("CPMASS", "P", P_inj_inlet, "Q", 0, "NitrousOxide");
-    cv = py.CoolProp.CoolProp.PropsSI("CVMASS", "P", P_inj_inlet, "Q", 0, "NitrousOxide");
+    if P_inj_inlet < 0 || abs(P_inj_inlet) < 1e-10
+        m_dot = 0;
+        return;
+    end
+    Q = 0;
+    if phase == "vapor"
+        Q = 1;
+    end
+    cp = py.CoolProp.CoolProp.PropsSI("CPMASS", "P", P_inj_inlet, "Q", Q, "NitrousOxide");
+    cv = py.CoolProp.CoolProp.PropsSI("CVMASS", "P", P_inj_inlet, "Q", Q, "NitrousOxide");
     %entropy = py.CoolProp.CoolProp.PropsSI("S", "P", P_inj_inlet, "Q", 0, "NitrousOxide");
     gammaN2O = cp/cv;
    
@@ -15,15 +23,22 @@ function m_dot = m_SPC(Cd_i_SPC,A_inj_N2O,P_inj_inlet, P_chamber)
     %Rstar = 8.314462618 / 0.044013 = 188.9092454
     % R = 8.314462618;
     % Rstar = 188.9092454; %J / kg / K
-    T_inlet = py.CoolProp.CoolProp.PropsSI('T', 'P', P_inj_inlet, 'Q', 0, "NitrousOxide");
-    rho_inj_inlet = py.CoolProp.CoolProp.PropsSI('D', 'P', P_inj_inlet, 'Q', 0, "NitrousOxide");
+    T_inlet = py.CoolProp.CoolProp.PropsSI('T', 'P', P_inj_inlet, 'Q', Q, "NitrousOxide");
+    rho_inj_inlet = py.CoolProp.CoolProp.PropsSI('D', 'P', P_inj_inlet, 'Q', Q, "NitrousOxide");
     %dZdTforcpressure = P_inj_inlet / Rstar * (dVdtforcpressure / T_inlet - 1 / (rho_inj_inlet*))
     %dVdTforcpressure = py.CoolProp.CoolProp.PropsSI('d(V)/d(T)|P', "P|liquid", P_inj_inlet, "Q", 0.0001, "NitrousOxide");
     h = 2;
-    dZdTforcrho = (py.CoolProp.CoolProp.PropsSI('Z', 'T', T_inlet, 'D', rho_inj_inlet, 'NitrousOxide') - py.CoolProp.CoolProp.PropsSI('Z', 'T', T_inlet-h, 'D', rho_inj_inlet, 'NitrousOxide'))/h;
-    dZdTforcpressure = (py.CoolProp.CoolProp.PropsSI('Z', 'T', T_inlet-h/2, 'P', P_inj_inlet, 'NitrousOxide') - py.CoolProp.CoolProp.PropsSI('Z', 'T', T_inlet-3*h/2, 'P', P_inj_inlet, 'NitrousOxide'))/h;
-    
-    Z_compfac = py.CoolProp.CoolProp.PropsSI('Z', 'P', P_inj_inlet, 'D', rho_inj_inlet, "NitrousOxide");
+    if phase == "liquid"
+        dZdTforcrho = (py.CoolProp.CoolProp.PropsSI('Z', 'T', T_inlet, 'D', rho_inj_inlet, 'NitrousOxide') - py.CoolProp.CoolProp.PropsSI('Z', 'T', T_inlet-h, 'D', rho_inj_inlet, 'NitrousOxide'))/h;
+        dZdTforcpressure = (py.CoolProp.CoolProp.PropsSI('Z', 'T', T_inlet-h/2, 'P', P_inj_inlet, 'NitrousOxide') - py.CoolProp.CoolProp.PropsSI('Z', 'T', T_inlet-3*h/2, 'P', P_inj_inlet, 'NitrousOxide'))/h;
+        
+        Z_compfac = py.CoolProp.CoolProp.PropsSI('Z', 'P', P_inj_inlet, 'D', rho_inj_inlet, "NitrousOxide");
+    else
+        dZdTforcrho = (py.CoolProp.CoolProp.PropsSI('Z', 'T|gas', T_inlet, 'D', rho_inj_inlet, 'NitrousOxide') - py.CoolProp.CoolProp.PropsSI('Z', 'T|gas', T_inlet-h, 'D', rho_inj_inlet, 'NitrousOxide'))/h;
+        dZdTforcpressure = (py.CoolProp.CoolProp.PropsSI('Z', 'T|gas', T_inlet-h/2, 'P', P_inj_inlet, 'NitrousOxide') - py.CoolProp.CoolProp.PropsSI('Z', 'T|gas', T_inlet-3*h/2, 'P', P_inj_inlet, 'NitrousOxide'))/h;
+        
+        Z_compfac = py.CoolProp.CoolProp.PropsSI('Z', 'P|gas', P_inj_inlet, 'D', rho_inj_inlet, "NitrousOxide");
+    end
 
     %Z_compfac
 

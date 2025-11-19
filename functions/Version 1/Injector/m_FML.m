@@ -1,10 +1,24 @@
 function mdot = m_FML(mSPC, mHEMc, chamber_pressure, P_inj_inlet, phase)
-    rho_downstream_l = py.CoolProp.CoolProp.PropsSI('D', 'P', chamber_pressure, 'Q', '0', "NitrousOxide");
-    rho_downstream_v = py.CoolProp.CoolProp.PropsSI('D', 'P', chamber_pressure, 'Q', '1', "NitrousOxide");
+    if mSPC + mHEMc == 0
+        mdot = 0;
+        return;
+    end
+    
+    if chamber_pressure == 0
+        mdot = mSPC + mHEMc;
+        return;
+    end
+    
+    Q = 0;
+    if phase == "vapor"
+        Q = 1;
+    end
+    rho_downstream_l = py.CoolProp.CoolProp.PropsSI('D', 'P', chamber_pressure, 'Q', Q, "NitrousOxide");
+    rho_downstream_v = py.CoolProp.CoolProp.PropsSI('D', 'P', chamber_pressure, 'Q', 1, "NitrousOxide");
 
     slip_velocity = (rho_downstream_l/rho_downstream_v)^(1/3);
-    entropy_inlet = py.CoolProp.CoolProp.PropsSI('S', 'P', P_inj_inlet, 'Q', 0, 'NitrousOxide');
-    entropy_outlet_l = py.CoolProp.CoolProp.PropsSI('S', 'P', chamber_pressure, 'Q', 0, 'NitrousOxide');
+    entropy_inlet = py.CoolProp.CoolProp.PropsSI('S', 'P', P_inj_inlet, 'Q', Q, 'NitrousOxide');
+    entropy_outlet_l = py.CoolProp.CoolProp.PropsSI('S', 'P', chamber_pressure, 'Q', Q, 'NitrousOxide');
     entropy_outlet_v = py.CoolProp.CoolProp.PropsSI('S', 'P', chamber_pressure, 'Q', 1, 'NitrousOxide');
     
     % Quality Calculation
