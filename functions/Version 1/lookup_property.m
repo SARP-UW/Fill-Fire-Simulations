@@ -16,7 +16,6 @@ function property = lookup_property(base_val, base_col, search_col, options)
     % Matrix Setup
     if options.matrix == 0
         t = readmatrix(sprintf("%s.xlsx", options.file));
-        
     else
         t = options.matrix;
     end
@@ -33,11 +32,9 @@ function property = lookup_property(base_val, base_col, search_col, options)
     for i = 2:t_size(1)
         if abs(t(i, base_col) - base_val) < 1e-10
             index = i;
-            out = 1;
             break;
         elseif abs(prev - base_val) < abs(t(i, base_col) - base_val)
             index = i-1;
-            out = 1;
             break;
         end
         prev = t(i, base_col);
