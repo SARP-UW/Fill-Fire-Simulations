@@ -11,7 +11,7 @@ function [m_dot, Fill_Time] = get_mdot_tank_orifice(pressure_tank, orifice_diame
 % m_dot: mass flow rate
 % Fill time: time to fill tank
 arguments (Input)
-    pressure_tank (1,1) double{mustBeReal, mustBeFinite, mustBePositive} %psi
+    pressure_tank (1,1) double{mustBeReal, mustBeFinite, mustBePositive} % MPa
     orifice_diameter (1,1) double{mustBeReal, mustBeFinite, mustBePositive} % in
     cylinder_diam (1,1) double{mustBeReal, mustBeFinite, mustBePositive} % In
     density_tank (1,1) double{mustBeReal, mustBeFinite, mustBePositive} % kg/m3
@@ -27,6 +27,8 @@ this_folder = fileparts(this_file);
 main_folder = fileparts(this_folder);
 addpath(fullfile(main_folder, 'functions'));
 cf = c();
+
+pressure_tank = pressure_tank * cf.mpa_to_psi;
 
 % Constants
 P_Initial = 14.7; %psi

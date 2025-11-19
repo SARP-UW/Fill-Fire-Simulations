@@ -2,7 +2,7 @@ function mdot_flow = get_mdot_fill(P1, P2, rho, mu)
     % P1 - upstream pressure (Pa)
     % P2 - downstream pressure (Pa)
     % rho - density (kg/m^3)
-    % mu - absolute viscosity (Pa s)
+    % mu - absolute viscosity (uPa s)
 
     %% Define characteristics from input sheet
     path = fullfile("..", "data", "line_properties.xlsx");
