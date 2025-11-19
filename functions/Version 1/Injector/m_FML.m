@@ -17,9 +17,9 @@ function mdot = m_FML(mSPC, mHEMc, chamber_pressure, P_inj_inlet, phase)
     rho_downstream_v = py.CoolProp.CoolProp.PropsSI('D', 'P', chamber_pressure, 'Q', 1, "NitrousOxide");
 
     slip_velocity = (rho_downstream_l/rho_downstream_v)^(1/3);
-    entropy_inlet = py.CoolProp.CoolProp.PropsSI('S', 'P', P_inj_inlet, 'Q', Q, 'NitrousOxide');
-    entropy_outlet_l = py.CoolProp.CoolProp.PropsSI('S', 'P', chamber_pressure, 'Q', Q, 'NitrousOxide');
-    entropy_outlet_v = py.CoolProp.CoolProp.PropsSI('S', 'P', chamber_pressure, 'Q', 1, 'NitrousOxide');
+    % entropy_inlet = py.CoolProp.CoolProp.PropsSI('S', 'P', P_inj_inlet, 'Q', Q, 'NitrousOxide');
+    % entropy_outlet_l = py.CoolProp.CoolProp.PropsSI('S', 'P', chamber_pressure, 'Q', Q, 'NitrousOxide');
+    % entropy_outlet_v = py.CoolProp.CoolProp.PropsSI('S', 'P', chamber_pressure, 'Q', 1, 'NitrousOxide');
     
     % Quality Calculation
     % s_tank = s_inj_outlet (assumption of isentropic flow)
@@ -27,6 +27,7 @@ function mdot = m_FML(mSPC, mHEMc, chamber_pressure, P_inj_inlet, phase)
     % s_inj_outlet = s_inj_out_liq + (s_inj_out_vap-s_inj_out_liq)*x
     % (s_inj_outlet - s_inj_out_liq) / (s_inj_out_vap-s_inj_out_liq) = 
     x_inj_out = (entropy_inlet - entropy_outlet_l) / (entropy_outlet_v-entropy_outlet_l);
+
 
     void_fraction = 1/(1+(1-x_inj_out) / x_inj_out * slip_velocity * (rho_downstream_v / rho_downstream_l));
 
