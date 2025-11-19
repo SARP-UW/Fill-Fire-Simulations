@@ -2,12 +2,7 @@
 % phase = f, g, x (for liquid or gas say "g" and "f", for saturated liquid use x = 0.9 (or whatever the quality is))
 % variable = variable for reference (ref. Excel sheet for headers)
 
-function output = get_state_variable(t, phase, variable)
-    this_file = mfilename('fullpath');
-    this_folder = fileparts(this_file);
-    main_folder = fileparts(this_folder);
-    liquid_properties_table = readtable(fullfile(main_folder, 'data', 'liquid_properties.xlsx'));
-    vapor_properties_table = readtable(fullfile(main_folder, 'data', 'vapor_properties.xlsx'));
+function output = get_state_variable(t, phase, variable, liquid_properties_table, vapor_properties_table)
     idx = find(liquid_properties_table.Temperature_K > t, 1, 'first');
     row_liquid2 = liquid_properties_table(idx, :);
     row_vapor2 = vapor_properties_table(idx, :);

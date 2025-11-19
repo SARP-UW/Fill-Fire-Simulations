@@ -2,14 +2,12 @@
 %energy_old: kJ/kg
 %temperature_old: K
 
-function [t, x] = state_density(density_new, energy_old, temperature_old)
+function [t, x] = state_density(density_new, energy_old, temperature_old, liquid_properties_table, vapor_properties_table)
     
     % Get path to the data folder and access to the vapor and liquid property excel tables 
     this_file = mfilename('fullpath');
     this_folder = fileparts(this_file);
     main_folder = fileparts(this_folder);
-    liquid_properties_table = readtable(fullfile(main_folder, 'data', 'liquid_properties.xlsx'));
-    vapor_properties_table = readtable(fullfile(main_folder, 'data', 'vapor_properties.xlsx'));
     addpath(fullfile(main_folder, 'functions'));
 
     % Get initial index to track the row in the excel tables that
@@ -42,29 +40,43 @@ function [t, x] = state_density(density_new, energy_old, temperature_old)
     final_t = temperature_old;
     final_x = x;
     
-    modifier = 1;
+    keep_iterating1 = true;
 
     % Ensure that the initial difference is positive in order to ensure the
     % solver is working properly
-    if difference_old < 0
-        disp(difference_old)
-        disp("Thermo solver failed maybe: Initial iteration is negative")
-        closest_row_liquid2 = liquid_properties_table(idx + 1, :);
-        closest_row_vapor2 = vapor_properties_table(idx + 1, :);
-        v_f2 = 1 / closest_row_liquid2.Density_kg_m3;
-        v_g2 = 1 / closest_row_vapor2.Density_kg_m3;
-        u_f2 = closest_row_liquid2.Internal_Energy_kJ_kg;
-        u_g2 = closest_row_vapor2.Internal_Energy_kJ_kg;
-        difference_2 = (v_t - v_f2)/(v_g2 - v_f2) - (u_t - u_f2)/(u_g2 - u_f2);
-        disp(difference_2)
+    if difference_old < 0 && keep_iterating1
+        
         keep_iterating = false;
-        final_x = (v_t - v_f2)/(v_g2 - v_f2);
+        
+        idx = idx + 1;
+        closest_row_liquid = liquid_properties_table(idx, :);
+        closest_row_vapor = vapor_properties_table(idx, :);
 
+        % Calculate corresponding u, v with this new, higher temperature
+        v_f = 1 / closest_row_liquid.Density_kg_m3;
+        v_g = 1 / closest_row_vapor.Density_kg_m3;
+        u_f = closest_row_liquid.Internal_Energy_kJ_kg;
+        u_g = closest_row_vapor.Internal_Energy_kJ_kg;
+        
+        % Calculate difference for solver
+        difference = (v_t - v_f)/(v_g - v_f) - (u_t - u_f)/(u_g - u_f);
+        final_x = ((v_t - v_f)/(v_g - v_f) + (u_t - u_f)/(u_g - u_f)) / 2;
+        t = closest_row_liquid.Temperature_K;
+
+        % If the difference now flips to positive, compute the temperature
+        % using the old difference
+        if difference > 0
+            total_difference = difference - difference_old;
+            delta_t = t - t_old;
+            final_t = t_old + (-difference_old/total_difference) * (delta_t);
+            keep_iterating1 = false;
+        end 
+
+        difference_old = difference;
+        t_old = t;
     end
-    count = 0;
-    while keep_iterating
 
-        count = count + 1;
+    while keep_iterating
         % Drop the temperature one row on the property tables
         idx = idx - 1;
         closest_row_liquid = liquid_properties_table(idx, :);
@@ -78,20 +90,16 @@ function [t, x] = state_density(density_new, energy_old, temperature_old)
         
         % Calculate difference for solver
         difference = (v_t - v_f)/(v_g - v_f) - (u_t - u_f)/(u_g - u_f);
-        disp(difference)
         final_x = ((v_t - v_f)/(v_g - v_f) + (u_t - u_f)/(u_g - u_f)) / 2;
         t = closest_row_liquid.Temperature_K;
 
         % If the difference now flips to negative, compute the temperature
         % using the old difference
-        if difference < 0 && modifier == 1
+        if difference < 0
             total_difference = difference_old - difference;
-            delta_t = t - t_old;
-            final_t = t + (difference/total_difference) * (delta_t);
+            delta_t = t_old - t;
+            final_t = t + (-difference/total_difference) * (delta_t);
             keep_iterating = false;
-            disp(count)
-        elseif difference > 0 && modifier == -1
-
         end
 
         difference_old = difference;
