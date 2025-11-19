@@ -13,5 +13,5 @@
 %   V_u - current ullage volume (m^3)
 
 function V_u = get_ullage_volume(V_u_prev, dt, rho_fu)
-    V_u = V_u_prev - (dt / rho_fu);
+    V_u = V_u_prev - (dt / rho_fu); %THIS IS INCORRECT DO NOT USE THIS
 end

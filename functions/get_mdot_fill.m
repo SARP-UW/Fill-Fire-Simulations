@@ -1,4 +1,9 @@
 function mdot_flow = get_mdot_fill(P1, P2, rho, mu)
+    % P1 - upstream pressure (Pa)
+    % P2 - downstream pressure (Pa)
+    % rho - density (kg/m^3)
+    % mu - absolute viscosity (Pa s)
+
     %% Define characteristics from input sheet
     path = fullfile("..", "data", "line_properties.xlsx");
     T = readcell(path);
@@ -9,6 +14,7 @@ function mdot_flow = get_mdot_fill(P1, P2, rho, mu)
     D = D ./ 39.37; % Inner diameter of tubings (m)
     epsilon = [T{6,2}, T{11,2}, T{15,2}]; % Absolute roughness of pipes (mm)
     Cv = T{7,2}; % K-bottle flow coefficient
+    mu = mu * 1e-6; % convert micropascals*s to Pascals*s
 
     rf_fittings = string(T(3:end, 3)); % String array of all fittings on the RF stand
     rf_fittings = rf_fittings(~ismissing(rf_fittings));
@@ -20,7 +26,7 @@ function mdot_flow = get_mdot_fill(P1, P2, rho, mu)
     diff = @(v) deltaP - guess_deltaP(max(v, 1e-6), rho, mu, L, D, epsilon, Cv, rf_fittings);
 
     vmin = 0.001;
-    vmax = 50;
+    vmax = 100;
 
     v_actual = fzero(diff, [vmin, vmax]);
 
@@ -78,16 +84,26 @@ function guess = guess_deltaP(v_guess, rho, mu, L, D, epsilon, Cv, rf_fittings)
 
     %% Calculate total deltaP guess
     guess = deltaP_1 + deltaP_2 + deltaP_3;
-
 end
 
 function f = get_friction_factor(D, epsilon, Re)
     d = D * 1000; % convert diameter from m to mm
+
+    % Laminar
+    if Re < 2000
+        f = 64 / Re;
+        return
+    end
+
+    % Transitional – use laminar as fallback
+    if Re < 3000
+        f = 64 / Re;
+        return
+    end
 
     % Calculate friction factor f with Serghide Approximation    
     A = -2 * log10((epsilon / (3.7 * d)) + (12 / Re));
     B = -2 * log10((epsilon / (3.7 * d)) + ((2.51 * A) / Re));
     C = -2 * log10((epsilon / (3.7 * d)) + ((2.51 * B) / Re));
     f = (A - ((B-A)^2 / (C - (2 * B) + A)))^(-2);
-
 end
