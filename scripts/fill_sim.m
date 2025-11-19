@@ -45,7 +45,7 @@ q_bottle = zeros(size(t));
 
 % Initialize temperature of the run tank and bottle straight from the excel
 % input sheet
-T_run_tank(1) = f_to_k(inputs.VALUE(strcmp(inputs.PARAMETER, "Initial Bottle Temperature (F)"))); % kelvin
+T_run_tank(1) = f_to_k(inputs.VALUE(strcmp(inputs.PARAMETER, "Initial Bottle Temperature (F)"))) - 0.9; % kelvin, estimate slightly less than bottle pressure
 T_bottle(1) = f_to_k(inputs.VALUE(strcmp(inputs.PARAMETER, "Initial Bottle Temperature (F)")));
 T_aluminum(1) = T_run_tank(1);
 T_amb = f_to_k(inputs.VALUE(strcmp(inputs.PARAMETER, "Initial Bottle Temperature (F)")));
@@ -70,9 +70,9 @@ q_bottle(1) = 0; % assuming no heat transfer FOR NOW
 
 % Initialize run tank properties
 x_run_tank(1) = 1; % assume all vapor at the beginning
-T_run_tank(1) = T_bottle(1); % assume temperature is equal
-P_run_tank(1) = P_bottle(1) - 10; % estimate initial dP to get a mass flow
+P_run_tank(1) = get_state_variable(T_run_tank(1), x_run_tank(1), "Pressure_Mpa") * cf.mpa_to_psi;
 v_run_tank(1) = get_state_variable(T_bottle(1), x_run_tank(1), "Volume_m3_kg") / cf.ft3lb_to_m3kg;
+disp(v_run_tank(1))
 m_run_tank(1) = vol_run_tank / v_run_tank(1);
 u_run_tank(1) = get_state_variable(T_bottle(1), x_run_tank(1), "Internal_Energy_kJ_kg");
 U_tot_run_tank(1) = u_run_tank(1) * m_run_tank(1);
@@ -81,8 +81,12 @@ mu_run_tank(1) = get_state_variable(T_bottle(1), 1, "Viscosity_uPa_s");
 
 
 for n = 2:length(t)-1
+    disp(n)
     % Calculate m_dot out of the run tank
-    [m_dot_run_tank_out(n), fill_time] = get_mdot_tank_orifice(P_run_tank(n - 1), orifice_diameter, cyl_diameter);
+    
+    [m_dot_run_tank_out(n), fill_time] = get_mdot_tank_orifice(P_run_tank(n - 1), orifice_diameter, cyl_diameter, 1 / v_run_tank(n-1)); % lb/s
+    m_dot_run_tank_out(n) = m_dot_run_tank_out(n) * cf.lb_to_kg;
+    disp(m_dot_run_tank_out(n))
 
     % Mass flow into run tank
     v_f_bottle(n) = 1 / get_state_variable(T_bottle(n-1), "f", "Density_kg_m3");
@@ -104,6 +108,8 @@ for n = 2:length(t)-1
 
     % New mass in run tank
     m_run_tank(n) = m_run_tank(n-1) + (m_dot_run_tank_in(n) - m_dot_run_tank_out(n))*dt;
+    disp(m_run_tank(n))
+    disp(m_run_tank(n-1))
     v_run_tank(n) = vol_run_tank / m_run_tank(n);
 
     % New energy in run tank
@@ -112,6 +118,11 @@ for n = 2:length(t)-1
     u_run_tank(n) = U_tot_run_tank(n) / m_run_tank(n);
     
     % New state in run tank
+    disp(1 / v_run_tank(n))
+    disp(1 / v_run_tank(n-1))
+    disp(u_run_tank(n))
+    disp(u_run_tank(n-1))
+    disp(T_run_tank(n-1))
     [T_run_tank(n), x_run_tank(n)] = state_density(1 / v_run_tank(n), u_run_tank(n), T_run_tank(n-1));
     P_run_tank(n) = get_state_variable(T_run_tank(n), x_run_tank(n), "Pressure_Mpa") * cf.mpa_to_psi;
     h_run_tank(n) = get_state_variable(T_run_tank(n), x_run_tank(n), "Enthalpy_kJ__kg");
