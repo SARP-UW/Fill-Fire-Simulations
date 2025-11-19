@@ -20,7 +20,7 @@ function pressuredrop = get_pressuredrop(mdot, rho, mu, K_total, tubeLength, tub
     %% Calculate pressure loss from pipes
 
     % Calculate Reynolds Number
-    Re = 353.7 * mdot * 3600 / (d * mu);
+    Re = 353.7 * mdot * 3600 / (d * mu * 1000);
 
     % Calculate friction factor f with Serghide Approximation    
     f = get_friction_factor(d, epsilon, Re);
