@@ -15,11 +15,6 @@
 % Output:
 %   m_Ox - current N2O mass (kg)
 
-function m_Ox = get_N2O_mass(phase, m_prev, mdot_prev, dt, rho_Ox, V_total_Ox)
-    if strcmpi(phase, 'liquid')
-        m_Ox = m_prev - mdot_prev * dt;
-    else
-        V_m3 = V_total_Ox / 1000;  % convert L → m^3
-        m_Ox = rho_Ox * V_m3;
-    end
+function m_Ox = get_N2O_mass(m_prev, mdot_prev, dt)
+    m_Ox = m_prev - mdot_prev * dt;
 end

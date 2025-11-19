@@ -21,6 +21,8 @@ phase = strings([1, N]);
 % N2O-injector 
 N2O_inj_P = zeros(1, N);
 N2O_mdot = zeros(1, N);
+mSPC = zeros(1,N);
+mHEMc = zeros(1,N);
 
 % Ethanol-tank 
 ethanol_mass = zeros(1, N);
@@ -80,7 +82,7 @@ N2O_tank_volume = 602 / 61.024; % (l)
 phase(1) = "liquid";
 
 % N2O-injector
-N2O_Cd = 1.901546;
+N2O_Cd = 0.3602;
 N2O_inj_a = 1.57e-5;
 N2O_inj_P(1) = N2O_tank_pressure(1);
 N2O_mdot(1) = get_mass_flow_SPI_N2O(N2O_Cd, N2O_inj_a, N2O_tank_density(1), N2O_inj_P(1)) * 0.1;
@@ -169,11 +171,12 @@ for i = 2:N-1
     % else
     %     N2O_mdot(i) = get_mass_flow_SPI_N2O(N2O_Cd, N2O_inj_a, N2O_tank_density(i-1), N2O_inj_P(i-1)-chamber_pressure(i-1));
     % end
-
+    mSPC(i) = m_SPC(N2O_Cd, N2O_inj_a, N2O_inj_P(i-1), chamber_pressure(i-1), phase(i));
+    mHEMc(i) = m_HEMc(N2O_inj_P(i-1), 0.9, N2O_inj_a, phase(i));
     if i < 10
-        N2O_mdot(i) = m_FML(m_SPC(N2O_Cd, N2O_inj_a, N2O_inj_P(i-1), chamber_pressure(i-1), phase(i)), m_HEMc(N2O_inj_P(i-1), N2O_Cd, N2O_inj_a, phase(i)), chamber_pressure(i-1), N2O_inj_P(i-1), phase(i)) * i / 10;
+        N2O_mdot(i) = m_FML(mSPC(i), mHEMc(i), chamber_pressure(i-1), N2O_inj_P(i-1), phase(i)) * i / 10;
     else
-        N2O_mdot(i) = m_FML(m_SPC(N2O_Cd, N2O_inj_a, N2O_inj_P(i-1), chamber_pressure(i-1), phase(i)), m_HEMc(N2O_inj_P(i-1), N2O_Cd, N2O_inj_a, phase(i)), chamber_pressure(i-1), N2O_inj_P(i-1), phase(i));
+        N2O_mdot(i) = m_FML(mSPC(i), mHEMc(i), chamber_pressure(i-1), N2O_inj_P(i-1), phase(i));
     end
 
 
@@ -185,16 +188,10 @@ for i = 2:N-1
     % Ethanol Injector
     % Startup
     ethanol_mdot(i) = get_ethanol_mass_flow(e_Cd, e_inj_a, ethanol_density, ethanol_inj_P(i-1) - chamber_pressure(i-1));
-    
-    if ethanol_mass(i) < 0
-        ethanol_mdot(i) = 0;
-    end
-    if N2O_mass(i) < 0
-        N2O_mdot(i) = 0;
-    end
+
     % Nitrous Oxide Tank
 % Lookup table version    phase(i) = get_N2O_phase(N2O_mass(i-1), N2O_mdot(i-1), dt, N2O_tank_volume, lookup_property(N2O_tank_pressure(i-1)/1000000, 2, 3, matrix=vap_props), phase(i-1));
-    N2O_mass(i) = get_N2O_mass(phase(i), N2O_mass(i-1), N2O_mdot(i-1), dt, N2O_tank_density(i-1), N2O_tank_volume);
+    N2O_mass(i) = get_N2O_mass(N2O_mass(i-1),N2O_mdot(i-1), dt);
     if N2O_mass(i) < 0
         N2O_mass(i) = 0;
     end
@@ -242,5 +239,8 @@ for i = 2:N-1
 end
 
 
-plot(t(1:end-1), raw_thrust(1:end-1), t, N2O_mass, t, ethanol_mass);
+plot(t(1:end-1), raw_thrust(1:end-1));
 %plot(t, chamber_pressure);
+
+figure(2);
+plot(t(1:end-1), N2O_mass(1:end-1), 'g', t(1:end-1), ethanol_mass(1:end-1), 'r');
