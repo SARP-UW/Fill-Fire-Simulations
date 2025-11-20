@@ -30,7 +30,7 @@ if phase == "vapor"
 end
 
 s_tank = py.CoolProp.CoolProp.PropsSI('S', 'P', N2O_inj_P, 'Q', Q, "NitrousOxide"); %J/kg/K
-H_tank = py.CoolProp.CoolProp.PropsSI('H', 'P', N2O_inj_P, 'Q', Q, "NitrousOxide"); %kJ/kg
+H_tank = py.CoolProp.CoolProp.PropsSI('H', 'P', N2O_inj_P, 'S', s_tank, "NitrousOxide"); %kJ/kg
 HEMmdots = zeros(1, N);
 
 %Find choked HEM flow rate for an inlet pressure by varying outlet pressure

@@ -20,13 +20,13 @@ function [P_c_new,F_new] = TransientThrustCurveAnalysis(calibration_data,P_c_sim
     
     % instantaneous
      if of_sim < of(1)
-        of_index = 1;
+        of_index = 1
         fprintf('warning! of is less than data range!')
     elseif of_sim > of(end)
-        of_index = length(of);
+        of_index = length(of)
         fprintf('warning! of is higher than data range!')
      else
-        of_index = interp1( of(1,1:end), 1:numel(of(1,1:end)), round( of_sim, 1) );
+        of_index = interp1( of(1,1:end), 1:numel(of(1,1:end)), round( of_sim, 1) )
         % of_index_l = floor( interp1( of(1,1:end), 1:numel(of(1,1:end)), round( of_sim, 1) ), 0 );
         % of_index_u = round( interp1( of(1,1:end), 1:numel(of(1,1:end)), round( of_sim, 1) ), 0 );
     end
@@ -35,7 +35,7 @@ function [P_c_new,F_new] = TransientThrustCurveAnalysis(calibration_data,P_c_sim
         P_c_index = 1;
         fprintf('warning! pressure is less than data range!')
     elseif P_c_sim > P_c(end)
-        P_c_index = length(P_c);
+        P_c_index = size(P_c,2);
         fprintf('warning! pressure is higher than data range!')
     else
         P_c_index = interp1( P_c(1:end,1).', 1:numel(P_c(1:end,1)), round( P_c_sim, 1) );
@@ -43,12 +43,12 @@ function [P_c_new,F_new] = TransientThrustCurveAnalysis(calibration_data,P_c_sim
         % P_c_index_u = round( interp1( P_c(1:end,1).', 1:numel(P_c(1:end,1)), round( P_c_sim, 1) ) );
     end
     
-    c_star_sim = interp2(c_star, of_index, P_c_index, 'linear');
+    c_star_sim = interp2(c_star, P_c_index, of_index, 'linear');
     P_c_new = c_star_sim * m_dot / A_t;
     
-    M_e_sim = interp2(M_e, of_index, P_c_index, 'linear' );
-    a_e_sim = interp2(a_e, of_index, P_c_index, 'linear' );
-    P_e_sim = interp2(P_e, of_index, P_c_index, 'linear' );
+    M_e_sim = interp2(M_e, P_c_index, of_index, 'linear' );
+    a_e_sim = interp2(a_e, P_c_index, of_index, 'linear' );
+    P_e_sim = interp2(P_e, P_c_index, of_index, 'linear' );
     
     v_e_sim = M_e_sim.*a_e_sim;
     F_new = m_dot.*v_e_sim + (P_e_sim - P_0)*A_e;

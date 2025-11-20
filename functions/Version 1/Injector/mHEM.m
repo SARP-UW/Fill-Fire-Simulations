@@ -10,6 +10,10 @@ function mdot = mHEM(inj_Cd, inj_A, P_inj_inlet, P_chamber, phase)
         return;
     end
 
+    if P_chamber < 1e5
+        P_chamber = 1e5;
+    end
+
     s_in = py.CoolProp.CoolProp.PropsSI('S', 'P', P_inj_inlet, 'Q', x, "NitrousOxide"); %J/(kg*K)
     rho_outlet = py.CoolProp.CoolProp.PropsSI('D', 'P', P_chamber, 'S', s_in, 'NitrousOxide');
     enth_in = py.CoolProp.CoolProp.PropsSI('H', 'P', P_inj_inlet, 'Q', x, 'NitrousOxide');

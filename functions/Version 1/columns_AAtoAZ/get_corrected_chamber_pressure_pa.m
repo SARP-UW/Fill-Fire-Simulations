@@ -21,7 +21,7 @@
 
 function P_chamber_corr = get_corrected_chamber_pressure_pa(P_chamber, P_chamber_raw, D1, mode)
     if strcmpi(mode, 'vapor')
-        P_chamber_corr = (P_chamber / 2) * D1 * 0.2;
+        P_chamber_corr = (P_chamber / 2) * D1;
     elseif strcmpi(mode, 'liquid')
         P_chamber_corr = P_chamber_raw * D1 * 0.2;
     else

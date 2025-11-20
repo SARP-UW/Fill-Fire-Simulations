@@ -32,7 +32,7 @@ function pressuredrop = get_pressuredrop(mdot, rho, mu, K_total, tubeLength, tub
     L_effective = L + L_eq;
 
     % Calculate pressure loss from pipes
-    pressuredrop = (f * L_effective * v^2 * rho) / (D * 2);
+    pressuredrop = (f * L_effective * v^2 * rho) / (D*2);
     
 end
 
