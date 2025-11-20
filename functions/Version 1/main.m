@@ -5,7 +5,7 @@ addpath("columns_AAtoAZ/", "columns_BAtoBZ/", "columns_AtoZ/","columns_CAtoCZ/",
 %% Vector declaration
 
 % Time and Timestep (seconds)
-final_t = 5;
+final_t = 6;
 dt = 0.01; 
 N = final_t / dt + 1;
 t = zeros(1, N);
@@ -66,6 +66,7 @@ mdot_total = zeros(1, N);
 chamber_pressure = zeros(1, N);
 of_ratio = zeros(1, N);
 thrust = zeros(1, N);
+thrust_C = zeros(1, N);
 
 %% Var. Lookup
 
@@ -91,10 +92,10 @@ N2O_tank_volume = 8.917783787; % (l)
 phase(1) = "liquid";
 
 % N2O-injector
-N2O_Cd = 0.3602;
-N2O_inj_a = 0.0001535;
+N2O_Cd = 0.09;
+N2O_inj_a = 0.00007; % m^2
 N2O_inj_P(1) = N2O_tank_pressure(1);
-N2O_mdot(1) = mSPI(N2O_Cd, N2O_inj_a, N2O_inj_P(1), 1.818955544220220e+05, "liquid") * 0.1;
+N2O_mdot(1) = mSPI(N2O_Cd, N2O_inj_a, N2O_inj_P(1), 1.818955544220220e+05, "liquid", 'nitrous') * 0.1;
 
 % Ethanol-tank 
 ethanol_mass(1) = 1.6; % (kg)
@@ -182,7 +183,7 @@ for i = 2:N-1
     % N2O Injector
     
     % Dyer
-    mdot_SPI(i) = mSPI(N2O_Cd, N2O_inj_a, N2O_inj_P(i-1), chamber_pressure(i-1), phase(i));
+    mdot_SPI(i) = mSPI(N2O_Cd, N2O_inj_a, N2O_inj_P(i-1), chamber_pressure(i-1), phase(i), 'nitrous');
     %mdot_HEM(i) = mHEM(0.9, N2O_inj_a, N2O_inj_P(i-1), chamber_pressure(i-1), phase(i));
     if phase(i) == 'liquid'
         mdot_HEM(i) = mHEM(0.9, N2O_inj_a, N2O_inj_P(i-1), chamber_pressure(i-1), phase(i));
@@ -219,7 +220,7 @@ for i = 2:N-1
     %test
 
     % Ethanol Injector
-    ethanol_mdot(i) = mSPI(e_Cd, e_inj_a, ethanol_inj_P(i-1), chamber_pressure(i-1), "liquid");
+    ethanol_mdot(i) = mSPI(e_Cd, e_inj_a, ethanol_inj_P(i-1), chamber_pressure(i-1), "liquid", 'ethanol');
 
     % Nitrous Oxide Tank
 % Lookup table version    phase(i) = get_N2O_phase(N2O_mass(i-1), N2O_mdot(i-1), dt, N2O_tank_volume, lookup_property(N2O_tank_pressure(i-1)/1000000, 2, 3, matrix=vap_props), phase(i-1));
@@ -329,21 +330,44 @@ for i = 2:N-1
     % end
     
     mdot_total(i) = get_total_mass_flow(N2O_mdot(i), ethanol_mdot(i));
-        if mdot_total(i) < 1
+    if mdot_total(i) < 0.2
         break;
     end
     of_ratio(i) = N2O_mdot(i) / ethanol_mdot(i);
     [chamber_pressure(i), thrust(i)] = TransientThrustCurveAnalysis('datatest3.mat', chamber_pressure(i-1), mdot_total(i), of_ratio(i));
+    
+    % Chamber Pressure Startup
     if i < 10
         chamber_pressure(i) = chamber_pressure(i) * i / 10;
     end
+
+    % Force Chamber Conditions (bad, but works)
     if chamber_pressure(i) > N2O_inj_P(i)
         chamber_pressure(i) = N2O_inj_P(i) - 1e6;
     elseif chamber_pressure(i) > ethanol_inj_P(i)
         chamber_pressure(i) = ethanol_inj_P(i);
+    elseif chamber_pressure(i) < 0
+        chamber_pressure(i) = N2O_inj_P(i) - 1e6;
     end
 
+    if i < 5
+        thrust_C(i) = (thrust(i-1) + thrust(i)) / 2; 
+    elseif i - N > 1
+        thrust_C(i) = (thrust(i-2) + thrust(i-1) + thrust(i) + thrust(i+1) + thrust(i+2)) / 5; 
+    else
+        thrust_C(i) = (thrust(i-1) + thrust(i)) / 2; 
+    end
 end
 
-newFigure(1, 3, 9000, gridOn=1, xaxis="Time (s)", yaxis='Thrust (N)', title='Thrust Curve for DC',int=0.25);
+newFigure(1, 6, max(thrust_C)+500, gridOn=1, xaxis="Time (s)", yaxis='Thrust (N)', title='Thrust Curve for DC',int=0.25);
 plot(t, thrust, 'LineWidth', 2, color='r');
+
+newFigure(2, 6, N2O_mass(1)+0.5, gridOn=1, xaxis="Time (s)", yaxis='Mass (kg)', title='Mass of Nitrous and Ethanol',int=0.25);
+plot(t(1:569), N2O_mass(1:569), 'LineWidth', 2, color='g');
+plot(t(1:569), ethanol_mass(1:569), 'LineWidth', 2, color='r');
+legend('Nitrous', 'Ethanol', 'FontSize', 12);
+
+newFigure(3, 6, N2O_tank_pressure(1)+100000, gridOn=1, xaxis="Time (s)", yaxis='Pressure (Pa)', title='Pressure Curves',int=0.25, y_min=2e6);
+plot(t(1:569), N2O_tank_pressure(1:569), 'LineWidth', 2, color='g');
+plot(t(1:569), n2_ullage_pressure(1:569), 'LineWidth', 2, color='r');
+legend('Nitrous', 'Ethanol', 'FontSize', 12);
