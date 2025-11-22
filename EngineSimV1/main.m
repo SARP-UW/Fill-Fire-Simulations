@@ -61,9 +61,8 @@ ox_out = 0;
 
 % N2O-injector
 N2O_Cd = 0.6;
-N2O_inj_a = 0.0000295205; % m^2
+N2O_inj_a = 0.00004; % m^2  % 0.0000295205 match phase change to eth-out
 N2O_CdA = N2O_Cd * N2O_inj_a;
-%N2O_CdA = 0.000070;
 N2O_CdA_HEM = 0.9 * N2O_inj_a;
 N2O_inj_P(1) = N2O_tank_pressure(1);
 N2O_mdot(1) = mSPI(N2O_CdA, N2O_inj_P(1), 1, "liquid", 'nitrous') * 0.1;
@@ -226,9 +225,9 @@ for i = 2:N-1
     end
         
     % Grow chamber pressure slowly at start
-    if i < 10
-        chamber_pressure(i) = chamber_pressure(i) * i / 10;
-    elseif i > 20
+    if i < 3
+        chamber_pressure(i) = chamber_pressure(i) * i / 3;
+    else
         if chamber_pressure(i) > chamber_pressure(i-1)
             chamber_pressure(i) = chamber_pressure(i-1);
         end
