@@ -17,8 +17,8 @@ inputs = readtable(fullfile(main_folder, 'data/fill_inputs.xlsx'), 'Sheet', 'She
 liquid_properties = readtable(fullfile(main_folder, 'data/liquid_properties.xlsx'), 'Sheet', 'Sheet1');
 vapor_properties = readtable(fullfile(main_folder, 'data/vapor_properties.xlsx'), 'Sheet', 'Sheet1');
 
-T = 10 * 60; % Total sim time in seconds
-dt = 0.1; % Time step in seconds
+T = 30 * 60; % Total sim time in seconds
+dt = 0.25; % Time step in seconds
 t = 0:dt:T; % Define time variable
 
 P_run_tank = zeros(size(t)); 
@@ -149,16 +149,20 @@ for n = 2:length(t)-1
     mu_bottle(n) = get_state_variable(T_bottle(n), x_bottle(n), "Viscosity_uPa_s", liquid_properties, vapor_properties);
 
     % Display time every minute
-    if mod(n, 600) == 0
-        fprintf("Current Time is %f minutes.", n / 60)
-        fprintf("Run Tank is %f percent filled with liquid.", (1 - x_run_tank) * 100)
+    if mod(n, (4 * 60)) == 0
+        fprintf("Current Time is %f minutes. ", n / (4 * 60))
+        fprintf("Run Tank is %f percent filled with liquid. \n", (1 - x_run_tank(n)) * 100)
     end
 
     % End loop if mostly filled with liquid in the run tank
     if(x_run_tank(n) < 0.05)
         final_timestep = n;
+        fprintf("The Orifice Diameter: %f in \n", orifice_diameter)
+        fprintf("Time to Fill: %f minutes \n", n / (4 * 60) )
+        fprintf("Nitrous Mass Left in Bottle: %f kg \n", m_bottle(n))
         break;
     end
+
 end
 
 warning(state);
