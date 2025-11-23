@@ -17,10 +17,6 @@ inputs = readtable(fullfile(main_folder, 'data/fill_inputs.xlsx'), 'Sheet', 'She
 liquid_properties = readtable(fullfile(main_folder, 'data/liquid_properties.xlsx'), 'Sheet', 'Sheet1');
 vapor_properties = readtable(fullfile(main_folder, 'data/vapor_properties.xlsx'), 'Sheet', 'Sheet1');
 
-T = 30 * 60; % Total sim time in seconds
-dt = 0.25; % Time step in seconds
-t = 0:dt:T; % Define time variable
-
 P_run_tank = zeros(size(t)); 
 P_bottle = zeros(size(t)); 
 T_run_tank = zeros(size(t));
@@ -88,10 +84,20 @@ U_tot_run_tank(1) = u_run_tank(1) * m_run_tank(1);
 h_run_tank(1) = get_state_variable(T_bottle(1), x_run_tank(1), "Enthalpy_kJ__kg", liquid_properties, vapor_properties);
 mu_run_tank(1) = get_state_variable(T_bottle(1), 1, "Viscosity_uPa_s", liquid_properties, vapor_properties);
 
+% Set up timesteps
+T = 30 * 60; % Total sim time in seconds
+dt = 0.25; % Time step in seconds
+t = 0:dt:T; % Define time variable
 final_timestep = T / dt;
 status = "Filling";
+endoffill = 0;
 
-for n = 2:length(t)-1   
+for n = 2:length(t)-1
+    % Check if holding time is completed
+    if n == (final_timestep + 1)
+        break;
+    end
+
     % Calculate m_dot out of the run tank
     m_dot_run_tank_out(n) = get_m_dot_run_tank_out(P_run_tank(n - 1), P_atmosphere, T_run_tank(n-1), vapor_properties, orifice_diameter); % kg/s
 
@@ -104,7 +110,7 @@ for n = 2:length(t)-1
     delta_P(n) = (P1_Pa - P2_Pa) * cf.mpa_to_psi * 10^(-6);
 
     if status == "Filling"
-        if delta_P(n) < 0.5 && x > 0
+        if delta_P(n) < 0.5 && delta_P(n) > 0
             m_dot_run_tank_in(n) = 0;
         elseif delta_P(n) > 0.5
             m_dot_run_tank_in(n) = get_mdot_fill(P1_Pa, P2_Pa, (1 / v_f_bottle(n)), mu_bottle(n));
@@ -114,9 +120,11 @@ for n = 2:length(t)-1
             fprintf("Run Tank Pressure is higher than Bottle. Ending Holding.")
             status = "End";
         else
-            m_dot_run_tank_in(n) = m_dot_run_tank_out(n);
+            m_dot_run_tank_in(n) = 0;
         end
+
     end
+
 
     % Heat transfer to run tank
     q_run_tank_nitrous(n) = nitrousQ(T_run_tank(n-1), T_aluminum(n-1)) * dt;
@@ -160,25 +168,30 @@ for n = 2:length(t)-1
     % Display time every minute
     if mod(n, (4 * 60)) == 0
         fprintf("Current Status is: %s \n", status)
-        fprintf("Current Time is %.3f minutes. ", n / (4 * 60))
+        fprintf("Current Time is %.2f minutes. ", n * dt / 60)
         fprintf("Run Tank is %.3f percent filled with liquid. \n", (1 - x_run_tank(n)) * 100)
     end
 
     % Check fill progress
     if(x_run_tank(n) < 0.05)
         if status == "Filling" % only executes if is first time reaching x < 0.05
+            endoffill = n;
+            final_timestep = n + (10 * 60 / dt); % Update final timestep to 10 minutes after competing fill
             fprintf("Run Tank is filled with Nitrous. Beginning Holding. \n")
             % fprintf("The Orifice Diameter: %f in \n", orifice_diameter)
-            fprintf("Time to Fill: %.3f minutes \n", n / (4 * 60) )
+            fprintf("Time to Fill: %.3f minutes \n", n * dt / 60)
             fprintf("Nitrous Mass Left in Bottle: %.3f kg \n", m_bottle(n))
+
+            status = "Holding";
         end
         status = "Holding";
     end
 
 end
 
-fprintf("Ending Simulation. Time: %.3f minutes \n", final_timestep / (4 * 60))
-fprintf("Nitrous Mass in Bottle: %.3f kg \n", m_bottle(final_timestep))
+fprintf("Ending Simulation. Time: %.3f minutes \n", final_timestep * dt / 60)
+% fprintf("Nitrous Mass in Bottle: %.3f kg \n", m_bottle(final_timestep))
+fprintf("Final Quality of Run Tank: %.3f", x_run_tank(final_timestep))
 
 warning(state);
 T_run_tank = (T_run_tank - 273.15) .* (9/5) + 32;
@@ -191,26 +204,37 @@ ft = final_timestep - 2;
 figure;
 subplot(2, 3, 1);
 plot(t(1:ft), T_run_tank(1:ft));
+xline(endoffill * dt, '-', 'End of Fill')
 xlabel("Time (seconds)")
 ylabel("Run Tank Temperature (Fahrenheit)")
+
 subplot(2, 3, 2);
 plot(t(1:ft), T_bottle(1:ft));
+xline(endoffill * dt, '-', 'End of Fill')
 xlabel("Time (seconds)")
 ylabel("Bottle Temperature (Fahrenheit)")
+
 subplot(2, 3, 3);
 plot(t(1:ft), delta_P(1:ft));
+xline(endoffill * dt, '-', 'End of Fill')
 xlabel("Time (seconds)")
 ylabel("Delta P (psi)")
+
 subplot(2, 3, 4);
 plot(t(1:ft), m_run_tank(1:ft));
+xline(endoffill * dt, '-', 'End of Fill')
 xlabel("Time (seconds)")
 ylabel("Run Tank Mass (lb)")
+
 subplot(2, 3, 5);
 plot(t(1:ft), m_bottle(1:ft));
+xline(endoffill * dt, '-', 'End of Fill')
 xlabel("Time (seconds)")
 ylabel("Bottle Mass (lb)")
+
 subplot(2, 3, 6);
 plot(t(1:ft), percent_filled(1:ft));
+xline(endoffill * dt, '-', 'End of Fill')
 xlabel("Time (seconds)")
 ylabel("Percent Liquid in Run Tank")
 
