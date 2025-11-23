@@ -17,7 +17,7 @@ inputs = readtable(fullfile(main_folder, 'data/fill_inputs.xlsx'), 'Sheet', 'She
 liquid_properties = readtable(fullfile(main_folder, 'data/liquid_properties.xlsx'), 'Sheet', 'Sheet1');
 vapor_properties = readtable(fullfile(main_folder, 'data/vapor_properties.xlsx'), 'Sheet', 'Sheet1');
 
-T = .5 * 60; % Total sim time in seconds
+T = 10 * 60; % Total sim time in seconds
 dt = 0.1; % Time step in seconds
 t = 0:dt:T; % Define time variable
 
@@ -66,6 +66,7 @@ orifice_diameter = inputs.VALUE(strcmp(inputs.PARAMETER, "Tank Orifice Diameter 
 cyl_diameter = inputs.VALUE(strcmp(inputs.PARAMETER, "Cylinder Diameter (in)"));
 vol_bottle = cf.ft3_to_m3 * inputs.VALUE(strcmp(inputs.PARAMETER, "Bottle Volume (ft3)"));
 vol_run_tank = cf.ft3_to_m3 * inputs.VALUE(strcmp(inputs.PARAMETER, "Run Tank Volume (ft3)"));
+P_atmosphere = inputs.VALUE(strcmp(inputs.PARAMETER, "Atmospheric Pressure (psia)"));
 
 % Initialize bottle properties
 m_bottle(1) = cf.lb_to_kg * inputs.VALUE(strcmp(inputs.PARAMETER, "Initial N2O Mass (lb)"));
@@ -91,9 +92,7 @@ final_timestep = T / dt;
 
 for n = 2:length(t)-1
     % Calculate m_dot out of the run tank
-    
-    [m_dot_run_tank_out(n), fill_time] = get_mdot_tank_orifice(P_run_tank(n - 1), orifice_diameter, cyl_diameter, 1 / v_run_tank(n-1)); % lb/s
-    m_dot_run_tank_out(n) = m_dot_run_tank_out(n) * cf.lb_to_kg;
+    m_dot_run_tank_out(n) = get_m_dot_run_tank_out(P_run_tank(n - 1), P_atmosphere, T_run_tank(n-1), vapor_properties, orifice_diameter); % kg/s
 
     % Mass flow into run tank
     v_f_bottle(n) = 1 / get_state_variable(T_bottle(n-1), "f", "Density_kg_m3", liquid_properties, vapor_properties);
@@ -149,13 +148,17 @@ for n = 2:length(t)-1
     v_g_bottle(n) = get_state_variable(T_bottle(n), "g", "Volume_m3_kg", liquid_properties, vapor_properties);
     mu_bottle(n) = get_state_variable(T_bottle(n), x_bottle(n), "Viscosity_uPa_s", liquid_properties, vapor_properties);
 
+    % Display time every minute
+    if mod(n, 600) == 0
+        fprintf("Current Time is %f minutes.", n / 60)
+        fprintf("Run Tank is %f percent filled with liquid.", (1 - x_run_tank) * 100)
+    end
+
     % End loop if mostly filled with liquid in the run tank
     if(x_run_tank(n) < 0.05)
         final_timestep = n;
         break;
     end
-
-
 end
 
 warning(state);
