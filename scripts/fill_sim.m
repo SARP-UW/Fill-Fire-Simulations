@@ -17,6 +17,14 @@ inputs = readtable(fullfile(main_folder, 'data/fill_inputs.xlsx'), 'Sheet', 'She
 liquid_properties = readtable(fullfile(main_folder, 'data/liquid_properties.xlsx'), 'Sheet', 'Sheet1');
 vapor_properties = readtable(fullfile(main_folder, 'data/vapor_properties.xlsx'), 'Sheet', 'Sheet1');
 
+% Set up timesteps
+T = 60 * 60; % Total sim time in seconds
+dt = inputs.VALUE(strcmp(inputs.PARAMETER, "Timestep")); % Time step in seconds
+t = 0:dt:T; % Define time variable
+final_timestep = T / dt;
+status = "Filling";
+endoffill = 0;
+
 P_run_tank = zeros(size(t)); 
 P_bottle = zeros(size(t)); 
 T_run_tank = zeros(size(t));
@@ -48,14 +56,19 @@ q_run_tank_nitrous = zeros(size(t));
 q_bottle = zeros(size(t));
 delta_P = zeros(size(t)); % psi, for reference only
 
-% Initialize temperature of the run tank and bottle straight from the excel
-% input sheet
+% Initialize temperature of the run tank and bottle from input sheet
 T_run_tank(1) = f_to_k(inputs.VALUE(strcmp(inputs.PARAMETER, "Initial Bottle Temperature (F)")) - 0.1); % kelvin, estimate slightly less than bottle pressure
 T_bottle(1) = f_to_k(inputs.VALUE(strcmp(inputs.PARAMETER, "Initial Bottle Temperature (F)")));
 T_aluminum(1) = T_run_tank(1);
 T_amb = f_to_k(inputs.VALUE(strcmp(inputs.PARAMETER, "Initial Bottle Temperature (F)")));
-wind_speed = 20;
-solar_zenith = 0;
+h_n = inputs.VALUE(strcmp(inputs.PARAMETER, "Heat Transfer Coefficient for Nitrous"));
+int_surf = inputs.VALUE(strcmp(inputs.PARAMETER, "Internal Surface Area of Run Tank (m^2)"));
+ext_surf = inputs.VALUE(strcmp(inputs.PARAMETER, "External Surface Area of Run Tank (m^2)"));
+wind_speed = inputs.VALUE(strcmp(inputs.PARAMETER, "Wind Speed (mph)"));
+solar_zenith = inputs.VALUE(strcmp(inputs.PARAMETER, "Solar Zenith (degrees)"));
+cp_alum = inputs.VALUE(strcmp(inputs.PARAMETER, "Specific Heat of Aluminum (Cp)"));
+mass_alum_tank = inputs.VALUE(strcmp(inputs.PARAMETER, "Mass of Run Tank (kg)"));
+
 
 % Import variables from the excel input sheet
 orifice_diameter = inputs.VALUE(strcmp(inputs.PARAMETER, "Tank Orifice Diameter (in)"));
@@ -84,14 +97,6 @@ U_tot_run_tank(1) = u_run_tank(1) * m_run_tank(1);
 h_run_tank(1) = get_state_variable(T_bottle(1), x_run_tank(1), "Enthalpy_kJ__kg", liquid_properties, vapor_properties);
 mu_run_tank(1) = get_state_variable(T_bottle(1), 1, "Viscosity_uPa_s", liquid_properties, vapor_properties);
 
-% Set up timesteps
-T = 30 * 60; % Total sim time in seconds
-dt = 0.25; % Time step in seconds
-t = 0:dt:T; % Define time variable
-final_timestep = T / dt;
-status = "Filling";
-endoffill = 0;
-
 for n = 2:length(t)-1
     % Check if holding time is completed
     if n == (final_timestep + 1)
@@ -100,7 +105,6 @@ for n = 2:length(t)-1
 
     % Calculate m_dot out of the run tank
     m_dot_run_tank_out(n) = get_m_dot_run_tank_out(P_run_tank(n - 1), P_atmosphere, T_run_tank(n-1), vapor_properties, orifice_diameter); % kg/s
-
     % Mass flow into run tank
     v_f_bottle(n) = 1 / get_state_variable(T_bottle(n-1), "f", "Density_kg_m3", liquid_properties, vapor_properties);
     mu_bottle(n) = get_state_variable(T_bottle(n-1), "f", "Viscosity_uPa_s", liquid_properties, vapor_properties);
@@ -122,14 +126,12 @@ for n = 2:length(t)-1
         else
             m_dot_run_tank_in(n) = 0;
         end
-
     end
 
-
     % Heat transfer to run tank
-    q_run_tank_nitrous(n) = nitrousQ(T_run_tank(n-1), T_aluminum(n-1)) * dt;
-    q_run_tank(n) = tankQ(T_amb, T_aluminum(n-1), q_run_tank_nitrous(n) / dt, wind_speed, solar_zenith) * dt;
-    T_aluminum(n) = tankT(q_run_tank(n) / dt, dt);
+    q_run_tank_nitrous(n) = nitrousQ(T_run_tank(n-1), T_aluminum(n-1), h_n, int_surf) * dt;
+    q_run_tank(n) = tankQ(T_amb, T_aluminum(n-1), q_run_tank_nitrous(n) * dt, wind_speed, solar_zenith, ext_surf) * dt;
+    T_aluminum(n) = tankT(q_run_tank(n) * dt, dt, cp_alum, mass_alum_tank);
     q_run_tank(n) = 0;
 
     % New mass in run tank
@@ -191,7 +193,7 @@ end
 
 fprintf("Ending Simulation. Time: %.3f minutes \n", final_timestep * dt / 60)
 % fprintf("Nitrous Mass in Bottle: %.3f kg \n", m_bottle(final_timestep))
-fprintf("Final Quality of Run Tank: %.3f", x_run_tank(final_timestep))
+fprintf("Final Quality of Run Tank: %.3f \n", x_run_tank(final_timestep))
 
 warning(state);
 T_run_tank = (T_run_tank - 273.15) .* (9/5) + 32;
