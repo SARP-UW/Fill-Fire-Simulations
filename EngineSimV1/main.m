@@ -53,17 +53,18 @@ TWR = zeros(1, N);
 
 % N2O-tank 
 N2O_tank_pressure(1) = 6.205e+6; % (Pa)
-N2O_tank_density(1) = 695.24; % (kg/m^3)
+N2O_tank_density(1) = py.CoolProp.CoolProp.PropsSI('D', 'P', N2O_tank_pressure(1), 'Q', 0, 'NitrousOxide'); % (kg/m^3)
 N2O_mass(1) = 6.2; % (kg)
 N2O_tank_volume = 8.917783787; % (l)
 phase(1) = "liquid";
 ox_out = 0;
 
 % N2O-injector
-N2O_Cd = 0.6;
-N2O_inj_a = 0.00004; % m^2  % 0.0000295205 match phase change to eth-out
+N2O_Cd = 0.3;
+N2O_inj_a = 0.000061; % m^2  % 0.0000295205 match phase change to eth-out
 N2O_CdA = N2O_Cd * N2O_inj_a;
-N2O_CdA_HEM = 0.9 * N2O_inj_a;
+N2O_Cd_HEM = 0.9;
+N2O_CdA_HEM = N2O_Cd_HEM * N2O_inj_a;
 N2O_inj_P(1) = N2O_tank_pressure(1);
 N2O_mdot(1) = mSPI(N2O_CdA, N2O_inj_P(1), 1, "liquid", 'nitrous') * 0.1;
 N2O_inj_stiffness = .20;
@@ -72,7 +73,7 @@ N2O_inj_dP(1) = N2O_inj_P(1) * N2O_inj_stiffness;
 % Ethanol-tank 
 ethanol_mass(1) = 1.6; % (kg)
 n2_ullage_pressure(1) = 6.205e+6; % (Pa)
-n2_ullage_volume(1) = 3.9 / 1000; % (m^3)
+n2_ullage_volume(1) = 3.9 / 1000; % (m^3) % should be 3.9
 n2_mass = n2_ullage_volume(1) * 67; % (kg), N2 density acquired from NIST table
 ethanol_density = 850; % (kg/m^3)
 den_tran = 0; % Don't change
@@ -102,10 +103,10 @@ ethanol_abs_visc = 1.04/1000; % Pa-s
 
 % Thrust Chamber
 mdot_total(1) = N2O_mdot(1) + ethanol_mdot(1);
-chamber_pressure(1) = 1; % Pa         (1.818955544220220e+05)
+chamber_pressure(1) = 1e5; % Pa         (1.818955544220220e+05)
 of_ratio(1) = N2O_mdot(1) / ethanol_mdot(1);
-dry_mass = 42; % (kg)
-total_mass(1) = dry_mass + N2O_mass(1) + ethanol_mass(1);
+dry_mass = 44; % (kg)
+total_mass(1) = dry_mass + N2O_mass(1) + ethanol_mass(1) + n2_mass;
 
 phase_change_i = 0; % Don't change
 
@@ -129,14 +130,21 @@ for i = 2:N-1
         props_matrix = vap_props;
     end
 
-    % Update N2O mass flow
+    % Update N2O mass flow by SFM model
     mdot_SPI(i) = mSPI(N2O_CdA, N2O_inj_P(i-1), chamber_pressure(i-1), phase(i), 'nitrous');
+    voidFraction = get_voidFraction(chamber_pressure(i-1), N2O_inj_P(i-1), phase(i));
     if phase(i) == 'liquid'
         mdot_HEM(i) = mHEM(N2O_CdA_HEM, N2O_inj_P(i-1), chamber_pressure(i-1), phase(i));
+        N2O_mdot(i) = (1 - voidFraction) * mdot_SPI(i) + voidFraction * mdot_HEM(i);
     else
         mdot_HEM(i) = m_HEMc(N2O_inj_P(i-1), N2O_CdA_HEM, phase(i));
+        N2O_mdot(i) = voidFraction * mdot_SPI(i) + (1 - voidFraction) * mdot_HEM(i);
     end
-    N2O_mdot(i) = 0.5 * mdot_SPI(i) + 0.5 * mdot_HEM(i); % Dyer model with K = 1
+    
+    % % Dyer model with K = 1
+    % N2O_mdot(i) = 0.5 * mdot_SPI(i) + 0.5 * mdot_HEM(i); 
+    
+
     
     if N2O_mdot(i) == 0
         break;
@@ -193,22 +201,30 @@ for i = 2:N-1
     % if N2O_line_dP(i) < 10e5
     %     N2O_line_dP(i) = 10e5;
     % end
+    
+    % N2O line dP stabilization
+    N2O_line_dP(i) = (N2O_line_dP(i-1) + N2O_line_dP(i)) / 2;
 
     N2O_inj_P(i) = N2O_tank_pressure(i) - N2O_line_dP(i);
     N2O_inj_dP(i) = N2O_inj_P(i) * N2O_inj_stiffness;
 
-    % If the sim is breaking, bound injector pressure conditions
-    if N2O_inj_P(i) < chamber_pressure(i-1)
-        N2O_inj_P(i) = chamber_pressure(i-1) + 1e6;
-    end
-    if N2O_inj_P(i) > N2O_tank_pressure(i-1)
-        N2O_inj_P(i) = N2O_tank_pressure(i-1) - 1e6;
-    end
+    % % If the sim is breaking, bound injector pressure conditions
+    % if N2O_inj_P(i) < chamber_pressure(i-1)
+    %     N2O_inj_P(i) = chamber_pressure(i-1) + 1e6;
+    % end
+    % if N2O_inj_P(i) > N2O_tank_pressure(i-1)
+    %     N2O_inj_P(i) = N2O_tank_pressure(i-1) - 1e6;
+    % end
     % Injector pressure stabilization
     N2O_inj_P(i) = (N2O_inj_P(i-1) + N2O_inj_P(i)) / 2; 
 
-    % Update ethanol line dP and injector pressure
+    % Update ethanol line dP
     ethanol_line_dP(i) = get_pressuredrop(ethanol_mdot(i), ethanol_density, ethanol_abs_visc, ethanol_K_loss, ethanol_line_length, ethanol_line_id);
+
+    % Ethanol line dP stabilization
+    ethanol_line_dP(i) = (ethanol_line_dP(i-1) + ethanol_line_dP(i)) / 2;
+
+    % Update ethanol injector pressure
     ethanol_inj_P(i) = n2_ullage_pressure(i) - ethanol_line_dP(i);
 
     % Update total mass flow, OF ratio, chamber pressure, and thrust
@@ -217,34 +233,46 @@ for i = 2:N-1
         break;
     end
     of_ratio(i) = N2O_mdot(i) / ethanol_mdot(i);
-    [chamber_pressure(i), thrust(i)] = TransientThrustCurveAnalysis('datatest3.mat', chamber_pressure(i-1), mdot_total(i), of_ratio(i));
+    [chamber_pressure(i), thrust(i)] = TransientThrustCurveAnalysis('datatest4.mat', chamber_pressure(i-1), mdot_total(i), of_ratio(i));
     
     % % Bound if needed
-    if N2O_inj_P(i) - chamber_pressure(i) < N2O_inj_dP(i)
-        chamber_pressure(i) = N2O_inj_P(i) - N2O_inj_dP(i);
-    end
+    % if N2O_inj_P(i) - chamber_pressure(i) < N2O_inj_dP(i)
+    %     chamber_pressure(i) = N2O_inj_P(i) - N2O_inj_dP(i);
+    % end
         
     % Grow chamber pressure slowly at start
     if i < 3
         chamber_pressure(i) = chamber_pressure(i) * i / 3;
-    else
-        if chamber_pressure(i) > chamber_pressure(i-1)
-            chamber_pressure(i) = chamber_pressure(i-1);
-        end
+    % else
+    %     if chamber_pressure(i) > chamber_pressure(i-1)
+    %         chamber_pressure(i) = chamber_pressure(i-1);
+    %     end
     end
+    
 
     % Thrust stabilization
-    thrust_C(i) = (thrust(i-1) + thrust(i)) / 2; 
+    thrust(i) = (thrust(i-1) + thrust(i)) / 2; 
+
+    % Fix until new CEA data is uploaded
+    if thrust(i) < 0
+        break;
+    end
+    
+    % Chamber pressure stabilization
+    chamber_pressure(i) = (chamber_pressure(i-1) + chamber_pressure(i)) / 2;
     
     % Calculate TWR
     total_mass(i) = dry_mass + N2O_mass(i) + ethanol_mass(i) + n2_mass;
-    TWR(i) = thrust_C(i) / (total_mass(i) * 9.8); % assume g is constant
+    TWR(i) = thrust(i) / (total_mass(i) * 9.8); % assume g is constant
     
-    % If OF ratio is too low, combustion will be bad, so end sim
-    if of_ratio(i) < 0.405
-        ox_out = 1;
-        break;
-    end
+    % % If OF ratio is too low, combustion will be bad, so end sim
+    % if i > 10
+    %     if of_ratio(i) < 0.405
+    %         ox_out = 1;
+    %         break;
+    %     end
+    % end
+
 end
 
 %% Plots
@@ -260,29 +288,35 @@ for k = length(t)-1:-1:1
 end
 
 % Thrust Curve
-newFigure(1, 6, max(thrust_C)+500, gridOn=1, xaxis="Time (s)", yaxis='Thrust (N)', title='Thrust Curve for DC',int=0.25);
-plot(t(1:t_end), thrust_C(1:t_end), 'LineWidth', 2, color='r');
+newFigure(1, final_t, max(thrust)+500, gridOn=1, xaxis="Time (s)", yaxis='Thrust (N)', title='$\textnormal{Thrust Curve for DC } (900\textnormal{PSI}/85^\circ{F})$', int=0.25, titleLat=1);
+plot(t(1:t_end), thrust(1:t_end), 'LineWidth', 2, color='r');
 
 % Mass Curves
-newFigure(2, 6, N2O_mass(1)+0.5, gridOn=1, xaxis="Time (s)", yaxis='Mass (kg)', title='Mass of Nitrous and Ethanol',int=0.25);
+newFigure(2, final_t, N2O_mass(1)+0.5, gridOn=1, xaxis="Time (s)", yaxis='Mass (kg)', title='$\textnormal{Mass of Nitrous and Ethanol } (900\textnormal{PSI}/85^\circ{F})$',int=0.25, titleLat=1);
 plot(t(1:t_end), N2O_mass(1:t_end), 'LineWidth', 2, color='g');
 plot(t(1:t_end), ethanol_mass(1:t_end), 'LineWidth', 2, color='r');
 legend('Nitrous', 'Ethanol', 'FontSize', 12);
 
 % Pressure Curves
-newFigure(3, 6, N2O_tank_pressure(1)+100000, gridOn=1, xaxis="Time (s)", yaxis='Pressure (Pa)', title='Pressure Curves',int=0.25, y_min=0);
+newFigure(3, final_t, N2O_tank_pressure(1)+100000, gridOn=1, xaxis="Time (s)", yaxis='Pressure (Pa)', title='$\textnormal{Pressure Curves } (900\textnormal{PSI}/85^\circ{F}\textnormal{, 6L ullage})$',int=0.25, y_min=0, titleLat=1);
 plot(t(1:t_end-1), N2O_tank_pressure(1:t_end-1), 'LineWidth', 2, color='g');
 plot(t(1:t_end-1), n2_ullage_pressure(1:t_end-1), 'LineWidth', 2, color='r');
 plot(t(1:t_end-1), chamber_pressure(1:t_end-1), 'LineWidth', 2, color='b');
-plot(t(1:t_end-1), N2O_inj_P(1:t_end-1), 'LineWidth', 2, color='y');
-legend('Nitrous', 'Ethanol', 'Chamber', 'N2O Injector', 'FontSize', 12);
+%plot(t(1:t_end-1), N2O_inj_P(1:t_end-1), 'LineWidth', 2, color='c');
+legend('Nitrous Tank', 'Ethanol Tank', 'Chamber', 'FontSize', 12);
+
+% Pressure Drop Through Lines
+newFigure(4, final_t, max(N2O_line_dP) + 100000, gridOn=1, xaxis="Time (s)", yaxis='Pressure (Pa)', title='$\textnormal{Pressure Drop through Lines } (900\textnormal{PSI}/85^\circ{F})$',int=0.25, y_min=0, titleLat=1);
+plot(t(1:t_end-1), N2O_line_dP(1:t_end-1), 'LineWidth', 2, color='g');
+plot(t(1:t_end-1), ethanol_line_dP(1:t_end-1), 'LineWidth', 2, color='r');
+legend('Nitrous Line', 'Ethanol Line', 'FontSize', 12);
 
 %% Make output file
 
-thrust_lbf = thrust_C / 4.448;
+thrust_lbf = thrust / 4.448;
 headings = {"Time", "Thrust (N)", "Thrust (lbf)", "N2O Mass Flow Rate (kg/s)", "N2O Mass (kg)", "Ethanol Mass Flow Rate (kg/s)", "Ethanol Mass (kg)", "TWR", "OFR", 'N2O Pressure (psi)', 'Ethanol Pressure (psi)', 'Nitrous Phase'};
 writecell(headings, 'outputs.csv');
-data = {t', thrust_C', thrust_lbf', N2O_mdot', N2O_mass', ethanol_mdot', ethanol_mass', TWR', of_ratio', N2O_tank_pressure'/6892, n2_ullage_pressure'/6892, phase'};
+data = {t', thrust', thrust_lbf', N2O_mdot', N2O_mass', ethanol_mdot', ethanol_mass', TWR', of_ratio', N2O_tank_pressure'/6892, n2_ullage_pressure'/6892, phase'};
 data = cell2mat(data);
 data = data(1:t_end, :);
 writematrix(data, "outputs.csv", 'WriteMode','append');
@@ -301,6 +335,35 @@ function phase = get_N2O_phase(m_prev, mdot_prev, dt, V_total_Ox, rho_Ox, prev_p
     else
         phase = 'liquid';
     end
+end
+
+function voidFraction = get_voidFraction(chamber_pressure, P_inj_inlet, phase)
+    
+    Q = 0;
+    if phase == "vapor"
+        Q = 1;
+    end
+    rho_downstream_l = py.CoolProp.CoolProp.PropsSI('D', 'P', chamber_pressure, 'Q', Q, "NitrousOxide");
+    rho_downstream_v = py.CoolProp.CoolProp.PropsSI('D', 'P', chamber_pressure, 'Q', 1, "NitrousOxide");
+
+    slip_velocity = (rho_downstream_l/rho_downstream_v)^(1/3);
+    entropy_inlet = py.CoolProp.CoolProp.PropsSI('S', 'P', P_inj_inlet, 'Q', Q, 'NitrousOxide');
+    entropy_outlet_l = py.CoolProp.CoolProp.PropsSI('S', 'P', chamber_pressure, 'Q', Q, 'NitrousOxide');
+    entropy_outlet_v = py.CoolProp.CoolProp.PropsSI('S', 'P', chamber_pressure, 'Q', 1, 'NitrousOxide');
+    
+    % Quality Calculation
+    % s_tank = s_inj_outlet (assumption of isentropic flow)
+    % s_inj_outlet = s_inj_out_liq*(1-x) + s_inj_out_vap*x
+    % s_inj_outlet = s_inj_out_liq + (s_inj_out_vap-s_inj_out_liq)*x
+    % (s_inj_outlet - s_inj_out_liq) / (s_inj_out_vap-s_inj_out_liq) = 
+    x_inj_out = (entropy_inlet - entropy_outlet_l) / (entropy_outlet_v-entropy_outlet_l);
+
+    if x_inj_out < 0
+        x_inj_out = 1;
+    end
+
+    voidFraction = 1/(1+(1-x_inj_out) / x_inj_out * slip_velocity * (rho_downstream_v / rho_downstream_l));
+
 end
 
 function [pressuredrop, v] = get_pressuredrop(mdot, rho, mu, K_total, tubeLength, tubeID)
