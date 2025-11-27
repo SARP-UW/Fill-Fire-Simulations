@@ -105,6 +105,7 @@ for n = 2:length(t)-1
 
     % Calculate m_dot out of the run tank
     m_dot_run_tank_out(n) = get_m_dot_run_tank_out(P_run_tank(n - 1), P_atmosphere, T_run_tank(n-1), vapor_properties, orifice_diameter); % kg/s
+    
     % Mass flow into run tank
     v_f_bottle(n) = 1 / get_state_variable(T_bottle(n-1), "f", "Density_kg_m3", liquid_properties, vapor_properties);
     mu_bottle(n) = get_state_variable(T_bottle(n-1), "f", "Viscosity_uPa_s", liquid_properties, vapor_properties);
@@ -131,7 +132,7 @@ for n = 2:length(t)-1
     % Heat transfer to run tank
     q_run_tank_nitrous(n) = nitrousQ(T_run_tank(n-1), T_aluminum(n-1), h_n, int_surf) * dt;
     q_run_tank(n) = tankQ(T_amb, T_aluminum(n-1), q_run_tank_nitrous(n) * dt, wind_speed, solar_zenith, ext_surf) * dt;
-    T_aluminum(n) = tankT(q_run_tank(n) * dt, dt, cp_alum, mass_alum_tank);
+    T_aluminum(n) = tankT(q_run_tank(n) * dt, dt, cp_alum, mass_alum_tank) + T_aluminum(n-1);
     q_run_tank(n) = 0;
 
     % New mass in run tank
