@@ -6,21 +6,24 @@ function m_dot_run_tank_out = get_m_dot_run_tank_out(P_tank, P_atmosphere, t_nit
     
     gamma = vapor_properties_table{idx, 9} / vapor_properties_table{idx, 8};
     rho = vapor_properties_table{idx, 3};
+    R = 188.91; % specific gas constant of nitrogen
 
-    P_tank = P_tank * 1e6; % Pa
+    P_tank = P_tank; % Pa
     P_atmosphere = P_atmosphere * 6894.76; % psi to Pa
 
     % Determine orifice geometric properties
     orifice_diameter = orifice_diameter * 0.0254; % conv in to m
-    beta = 0; % diameter ratio (setting to 0 for now, due to tank being much larger)
     Cd = 0.8; % discharge coefficient of orifice
-    C = Cd / ((1 - (beta ^ 4)) ^ (1/2));
     A = pi * (orifice_diameter ^ 2) / 4;
 
-    % Determine net expansion factor for compressible fluids
-    Y = 1 - (0.351 + 0.256 * (beta^4) + 0.93 * (beta ^ 8)) * (1 - ( (P_atmosphere / P_tank) ^ (1/gamma)) );
-
-    % Determine mass flow
-    m_dot_run_tank_out = rho * Y * C * A * ((2 * (P_tank - P_atmosphere) / rho) ^ (1/2));
-
+    % Check if flow is choked
+    p_ratio = P_atmosphere / P_tank;
+    p_ratio_crit = (2 / (gamma + 1))^(gamma / (gamma -1));
+    if p_ratio <= p_ratio_crit % choked flow
+        m_dot_run_tank_out = Cd * A * P_tank * sqrt(gamma / (R * t_nitrous)) * (2 / (gamma + 1))^((gamma + 1)/(2 * (gamma - 1)));
+    else % unchoked
+        x = p_ratio^(2/gamma) - p_ratio^((gamma + 1)/gamma);
+        y = (2 * gamma) / (R * t_nitrous * (gamma - 1)) * x;
+        m_dot_run_tank_out = Cd * A * P_tank * sqrt(y);
+    end
 end
