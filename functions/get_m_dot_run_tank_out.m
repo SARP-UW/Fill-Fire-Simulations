@@ -8,7 +8,7 @@ function m_dot_run_tank_out = get_m_dot_run_tank_out(P_tank, P_atmosphere, t_nit
     rho = vapor_properties_table{idx, 3};
     R = 188.91; % specific gas constant of nitrogen
 
-    P_tank = P_tank; % Pa
+    P_tank = P_tank * 10^6; % Pa
     P_atmosphere = P_atmosphere * 6894.76; % psi to Pa
 
     % Determine orifice geometric properties
