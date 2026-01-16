@@ -56,6 +56,7 @@ total_mass = zeros(1, N);
 TWR = zeros(1, N);
 impulse = zeros(1, N);
 ISP = zeros(1, N);
+choke_condition = strings([1, N]);
 
 %% Inputs and initial conditions
 
@@ -278,7 +279,7 @@ for i = 2:N-1
         break;
     end
     of_ratio(i) = N2O_mdot(i) / ethanol_mdot(i);
-    [chamber_pressure(i), thrust(i)] = TransientThrustCurveAnalysis('dataeth95.mat', chamber_pressure(i-1), mdot_total(i), of_ratio(i));
+    [chamber_pressure(i), thrust(i), choke_condition(i)] = TransientThrustCurveAnalysis('dataeth95.mat', chamber_pressure(i-1), mdot_total(i), of_ratio(i));
     
     % % Bound if needed
     % if N2O_inj_P(i) - chamber_pressure(i) < N2O_inj_dP(i)
@@ -557,7 +558,7 @@ function mdot = mSPI(CdA, P_inj_inlet, P_chamber, phase, fluid)
 
 end
 
-function [P_c_new,F_new] = TransientThrustCurveAnalysis(calibration_data,P_c_sim,m_dot,of_sim,P_0,A_e,A_t)
+function [P_c_new,F_new,chokeValue] = TransientThrustCurveAnalysis(calibration_data,P_c_sim,m_dot,of_sim,P_0,A_e,A_t)
     arguments (Input)
         calibration_data {mustBeText}
         P_c_sim (1,1) {mustBeReal, mustBePositive} = 3.8 * 10^6 %temp
@@ -565,7 +566,7 @@ function [P_c_new,F_new] = TransientThrustCurveAnalysis(calibration_data,P_c_sim
         of_sim (1,1) {mustBeReal, mustBePositive} = 4 % temp
         P_0 (1,1) {mustBeReal, mustBePositive} = 101325 % optional
         A_e (1,1) {mustBeReal, mustBePositive} = 123.899*(1/100)^2 % optional
-        A_t (1,1) {mustBeReal, mustBePositive} = 9.5e-4; %5.69 * (1/100)^2 % optional
+        A_t (1,1) {mustBeReal, mustBePositive} = 5.69 * (1/100)^2 % optional
     end
 
     load(calibration_data);
@@ -612,7 +613,10 @@ function [P_c_new,F_new] = TransientThrustCurveAnalysis(calibration_data,P_c_sim
 
     P_crit = P_c_new*(2 / (gamma_e_new + 1))^( gamma_e_new/(gamma_e_new - 1 ) );
     if P_e_new < P_crit
-        fprintf('flow is not choked :(')
+        %fprintf('flow is not choked :(')
+        chokeValue = 'Not choked';
+    else
+        chokeValue = 'Choked';
     end
 end
 
