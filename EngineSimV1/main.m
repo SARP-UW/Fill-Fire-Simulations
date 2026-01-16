@@ -576,6 +576,7 @@ function [P_c_new,F_new] = TransientThrustCurveAnalysis(calibration_data,P_c_sim
     M_e = data.M_e;
     a_e = data.a_e;
     P_e = data.P_e;
+    gamma_e = data.gamma_e;
     
     % instantaneous
      if of_sim < of(1)
@@ -586,8 +587,6 @@ function [P_c_new,F_new] = TransientThrustCurveAnalysis(calibration_data,P_c_sim
         %fprintf('warning! of is higher than data range!')
      else
         of_index = interp1( of(1,1:end), 1:numel(of(1,1:end)), round( of_sim, 1) );
-        % of_index_l = floor( interp1( of(1,1:end), 1:numel(of(1,1:end)), round( of_sim, 1) ), 0 );
-        % of_index_u = round( interp1( of(1,1:end), 1:numel(of(1,1:end)), round( of_sim, 1) ), 0 );
     end
     
     if P_c_sim < data.P_c(1)
@@ -598,19 +597,23 @@ function [P_c_new,F_new] = TransientThrustCurveAnalysis(calibration_data,P_c_sim
         %fprintf('warning! pressure is higher than data range!')
     else
         P_c_index = interp1( P_c(1:end,1).', 1:numel(P_c(1:end,1)), round( P_c_sim, 1) );
-        % P_c_index_l = floor( interp1( P_c(1:end,1).', 1:numel(P_c(1:end,1)), round( P_c_sim, 1) ) );
-        % P_c_index_u = round( interp1( P_c(1:end,1).', 1:numel(P_c(1:end,1)), round( P_c_sim, 1) ) );
     end
     
-    c_star_sim = interp2(c_star, of_index, P_c_index, 'linear');
-    P_c_new = c_star_sim * m_dot / A_t;
+    c_star_new = interp2(c_star, of_index, P_c_index, 'linear');
+    P_c_new = c_star_new * m_dot / A_t;
     
-    M_e_sim = interp2(M_e, of_index, P_c_index, 'linear' );
-    a_e_sim = interp2(a_e, of_index, P_c_index, 'linear' );
-    P_e_sim = interp2(P_e, of_index, P_c_index, 'linear' );
+    M_e_new = interp2(M_e, of_index, P_c_index, 'linear' );
+    a_e_new = interp2(a_e, of_index, P_c_index, 'linear' );
+    P_e_new = interp2(P_e, of_index, P_c_index, 'linear' );
+    gamma_e_new = interp2(gamma_e, of_index, P_c_index,'linear');
     
-    v_e_sim = M_e_sim.*a_e_sim;
-    F_new = m_dot.*v_e_sim + (P_e_sim - P_0)*A_e;
+    v_e_new = M_e_new.*a_e_new;
+    F_new = m_dot.*v_e_new + (P_e_new - P_0)*A_e;
+
+    P_crit = P_c_new*(2 / (gamma_e_new + 1))^( gamma_e_new/(gamma_e_new - 1 ) );
+    if P_e_new < P_crit
+        fprintf('flow is not choked :(')
+    end
 end
 
 function property = lookup_property(base_val, base_col, search_col, options)
