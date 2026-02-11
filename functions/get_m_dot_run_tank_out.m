@@ -1,15 +1,19 @@
-function m_dot_run_tank_out = get_m_dot_run_tank_out(P_tank, P_atmosphere, t_nitrous, vapor_properties_table, orifice_diameter)
+function m_dot_run_tank_out = get_m_dot_run_tank_out(P_tank, P_atmosphere, t_nitrous, orifice_diameter)
     %% This function calculates the mass flow out of the run tank for a given pressure
 
     % Determine nitrous properties
-    [~, idx] = min(abs(vapor_properties_table.Temperature_K - t_nitrous));
+    %[~, idx] = min(abs(vapor_properties_table.Temperature_K - t_nitrous));
     
-    gamma = vapor_properties_table{idx, 9} / vapor_properties_table{idx, 8};
-    rho = vapor_properties_table{idx, 3};
-    R = 188.91; % specific gas constant of nitrogen
+    %gamma = vapor_properties_table{idx, 9} / vapor_properties_table{idx, 8};
+    %rho = vapor_properties_table{idx, 3};
 
+    % Determine nitrous properties(new)
+    cp = py.CoolProp.CoolProp.PropsSI('Cpmass', 'T', t_nitrous, 'Q', 1, 'N2O');
+    cv = py.CoolProp.CoolProp.PropsSI('Cvmass', 'T', t_nitrous, 'Q', 1, 'N2O');
+    gamma = cp / cv; % Calculate specific heat ratio
     P_tank = P_tank * 10^6; % Pa
     P_atmosphere = P_atmosphere * 6894.76; % psi to Pa
+    R = 188.91; % specific gas constant of nitrogen
 
     % Determine orifice geometric properties
     orifice_diameter = orifice_diameter * 0.0254; % conv in to m

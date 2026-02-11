@@ -2,16 +2,34 @@
 %energy_old: kJ/kg
 %temperature_old: K
 
-function [t, x] = state_density(density_new, energy_old, temperature_old, liquid_properties_table, vapor_properties_table)
-    
+function [t, x] = state_density(density_new, energy_old, temperature_old)
+
+    u_SI = energy_old * 1000; %kJ/kg to J/kg
+    rho_SI = density_new;
+
+    try
+        t = py.CoolProp.CoolProp.PropsSI('T', 'D', rho_SI, 'U', u_SI, 'N2O'); %temp cal
+
+        x = py.CoolProp.CoolProp.PropsSI('Q', 'D', rho_SI, 'U', u_SI, 'N2O'); %quality cal
+        
+        if x < 0; x = 0; elseif x > 1; x = 1; end %limit quality from 0 to 1
+        
+    catch
+        fprintf('Warning: CoolProp convergence failed. Returning old temperature.\n'); %error code
+        t = temperature_old;
+        x = 0; % default
+    end
+end
+
+
+%{
     % Get path to the data folder and access to the vapor and liquid property excel tables 
     this_file = mfilename('fullpath');
     this_folder = fileparts(this_file);
     main_folder = fileparts(this_folder);
     addpath(fullfile(main_folder, 'functions'));
 
-    % Get initial index to track the row in the excel tables that
-    % corresponds to the old temperature
+    % Get initial index to track the row in the excel tables that corresponds to the old temperature
     [~, idx] = min(abs(liquid_properties_table.Temperature_K - temperature_old));
     closest_row_liquid = liquid_properties_table(idx, :);
     closest_row_vapor = vapor_properties_table(idx, :);
@@ -110,3 +128,4 @@ function [t, x] = state_density(density_new, energy_old, temperature_old, liquid
     x = final_x;
 
 end
+%}
