@@ -13,9 +13,12 @@ main_folder = fileparts(this_folder);
 addpath(fullfile(main_folder, 'functions'));
 cf = c();
 
-inputs = readtable(fullfile(main_folder, 'data/fill_inputs.xlsx'), 'Sheet', 'Sheet1');
-liquid_properties = readtable(fullfile(main_folder, 'data/liquid_properties.xlsx'), 'Sheet', 'Sheet1');
-vapor_properties = readtable(fullfile(main_folder, 'data/vapor_properties.xlsx'), 'Sheet', 'Sheet1');
+%inputs = readtable(fullfile(main_folder, 'data/fill_inputs.xlsx'), 'Sheet', 'Sheet1');
+inputs = readtable(fullfile(main_folder, 'data', 'fill_inputs.xlsx'), 'Sheet', 'Sheet1');
+
+liquid_properties = readtable(fullfile(main_folder, 'data', 'liquid_properties.xlsx'), 'Sheet', 'Sheet1'); 
+vapor_properties = readtable(fullfile(main_folder, 'data', 'vapor_properties.xlsx'), 'Sheet', 'Sheet1');
+
 
 % Set up timesteps
 T = 60 * 60; % Total sim time in seconds
@@ -78,24 +81,36 @@ vol_run_tank = cf.ft3_to_m3 * inputs.VALUE(strcmp(inputs.PARAMETER, "Run Tank Vo
 P_atmosphere = inputs.VALUE(strcmp(inputs.PARAMETER, "Atmospheric Pressure (psia)"));
 
 % Initialize bottle properties
+fluid = 'NitrousOxide';
 m_bottle(1) = cf.lb_to_kg * inputs.VALUE(strcmp(inputs.PARAMETER, "Initial N2O Mass (lb)"));
 v_bottle(1) = vol_bottle / m_bottle(1);
-x_bottle(1) = get_quality(T_bottle(1), "Volume_m3_kg", v_bottle(1));
-u_bottle(1) = get_state_variable(T_bottle(1), x_bottle(1), "Internal_Energy_kJ_kg", liquid_properties, vapor_properties);
+x_bottle(1) = py.CoolProp.CoolProp.PropsSI('Q', 'T', T_bottle(1), 'D', 1/v_bottle(1), fluid);
+u_bottle(1) = py.CoolProp.CoolProp.PropsSI('U', 'T', T_bottle(1), 'D', 1/v_bottle(1), fluid) / 1000; %J/kg -> kJ/kg
 U_tot_bottle(1) = u_bottle(1) * m_bottle(1);
-h_bottle(1) = get_state_variable(T_bottle(1), x_bottle(1), "Enthalpy_kJ__kg", liquid_properties, vapor_properties);
-P_bottle(1) = get_state_variable(T_bottle(1), x_bottle(1), "Pressure_Mpa", liquid_properties, vapor_properties);
+h_bottle(1) = py.CoolProp.CoolProp.PropsSI('H', 'T', T_bottle(1), 'D', 1/v_bottle(1), fluid) / 1000; %J/kg -> kJ/kg
+P_bottle(1) = py.CoolProp.CoolProp.PropsSI('P', 'T', T_bottle(1), 'D', 1/v_bottle(1), fluid) / 1e6; 
 q_bottle(1) = 0; % assuming no heat transfer FOR NOW
+%x_bottle(1) = get_quality(T_bottle(1), "Volume_m3_kg", v_bottle(1));
+%u_bottle(1) = get_state_variable(T_bottle(1), x_bottle(1), "Internal_Energy_kJ_kg", liquid_properties, vapor_properties);
+%h_bottle(1) = get_state_variable(T_bottle(1), x_bottle(1), "Enthalpy_kJ__kg", liquid_properties, vapor_properties);
+%P_bottle(1) = get_state_variable(T_bottle(1), x_bottle(1), "Pressure_Mpa", liquid_properties, vapor_properties);
+
 
 % Initialize run tank properties
 x_run_tank(1) = 1; % assume all vapor at the beginning
-P_run_tank(1) = get_state_variable(T_run_tank(1), x_run_tank(1), "Pressure_Mpa", liquid_properties, vapor_properties);
-v_run_tank(1) = get_state_variable(T_bottle(1), x_run_tank(1), "Volume_m3_kg", liquid_properties, vapor_properties);
+P_run_tank(1) = double(py.CoolProp.CoolProp.PropsSI('P', 'T', T_run_tank(1), 'Q', x_run_tank(1), fluid)) / 1e6;
+v_run_tank(1) = 1 / double(py.CoolProp.CoolProp.PropsSI('D', 'T', T_bottle(1), 'Q', x_run_tank(1), fluid));
 m_run_tank(1) = vol_run_tank / v_run_tank(1);
-u_run_tank(1) = get_state_variable(T_bottle(1), x_run_tank(1), "Internal_Energy_kJ_kg", liquid_properties, vapor_properties);
+u_run_tank(1) = double(py.CoolProp.CoolProp.PropsSI('U', 'T', T_bottle(1), 'Q', x_run_tank(1), fluid)) / 1000;
 U_tot_run_tank(1) = u_run_tank(1) * m_run_tank(1);
-h_run_tank(1) = get_state_variable(T_bottle(1), x_run_tank(1), "Enthalpy_kJ__kg", liquid_properties, vapor_properties);
+h_run_tank(1) = double(py.CoolProp.CoolProp.PropsSI('H', 'T', T_bottle(1), 'Q', x_run_tank(1), fluid)) / 1000;
+%mu_run_tank(1) = double(py.CoolProp.CoolProp.PropsSI('V', 'T', T_bottle(1), 'D', 1 / v_run_tank(1), fluid)) * 1e6;
+%P_run_tank(1) = get_state_variable(T_run_tank(1), x_run_tank(1), "Pressure_Mpa", liquid_properties, vapor_properties);
+%v_run_tank(1) = get_state_variable(T_bottle(1), x_run_tank(1), "Volume_m3_kg", liquid_properties, vapor_properties);
+%u_run_tank(1) = get_state_variable(T_bottle(1), x_run_tank(1), "Internal_Energy_kJ_kg", liquid_properties, vapor_properties);
+%h_run_tank(1) = get_state_variable(T_bottle(1), x_run_tank(1), "Enthalpy_kJ__kg", liquid_properties, vapor_properties);
 mu_run_tank(1) = get_state_variable(T_bottle(1), 1, "Viscosity_uPa_s", liquid_properties, vapor_properties);
+
 
 for n = 2:length(t)-1
     % Check if holding time is completed
@@ -104,10 +119,12 @@ for n = 2:length(t)-1
     end
 
     % Calculate m_dot out of the run tank
-    m_dot_run_tank_out(n) = get_m_dot_run_tank_out(P_run_tank(n - 1), P_atmosphere, T_run_tank(n-1), vapor_properties, orifice_diameter); % kg/s
+    m_dot_run_tank_out(n) = get_m_dot_run_tank_out(P_run_tank(n - 1), P_atmosphere, T_run_tank(n-1), orifice_diameter); % kg/s
     
     % Mass flow into run tank
-    v_f_bottle(n) = 1 / get_state_variable(T_bottle(n-1), "f", "Density_kg_m3", liquid_properties, vapor_properties);
+    v_f_bottle(n) = 1 / py.CoolProp.CoolProp.PropsSI('D', 'T', T_bottle(n-1), 'Q', 0, fluid);
+    %mu_bottle(n) = py.CoolProp.CoolProp.PropsSI('V', 'T', T_bottle(n-1), 'Q', 0, fluid) * 1e6;
+    %v_f_bottle(n) = 1 / get_state_variable(T_bottle(n-1), "f", "Density_kg_m3", liquid_properties, vapor_properties);
     mu_bottle(n) = get_state_variable(T_bottle(n-1), "f", "Viscosity_uPa_s", liquid_properties, vapor_properties);
     
     P1_Pa = P_bottle(n-1) * 10^(6);
@@ -145,11 +162,16 @@ for n = 2:length(t)-1
     u_run_tank(n) = U_tot_run_tank(n) / m_run_tank(n);
     
     % New state in run tank
-    [T_run_tank(n), x_run_tank(n)] = state_density(1 / v_run_tank(n), u_run_tank(n), T_run_tank(n-1), liquid_properties, vapor_properties);
-    P_run_tank(n) = get_state_variable(T_run_tank(n), x_run_tank(n), "Pressure_Mpa", liquid_properties, vapor_properties);
-    h_g_run_tank(n) = get_state_variable(T_run_tank(n), "g", "Enthalpy_kJ__kg", liquid_properties, vapor_properties);
-    v_f_run_tank(n) = get_state_variable(T_run_tank(n), "f", "Volume_m3_kg", liquid_properties, vapor_properties);
-    v_g_run_tank(n) = get_state_variable(T_run_tank(n), "g", "Volume_m3_kg", liquid_properties, vapor_properties);
+    [T_run_tank(n), x_run_tank(n)] = state_density(1 / v_run_tank(n), u_run_tank(n), T_run_tank(n-1));
+    P_run_tank(n) = py.CoolProp.CoolProp.PropsSI('P', 'T', T_run_tank(n), 'Q', x_run_tank(n), fluid) / 1e6; %Pa to MPa
+    h_g_run_tank(n) = py.CoolProp.CoolProp.PropsSI('H', 'T', T_run_tank(n), 'Q', 1, fluid) / 1000; %J/kg to kJ/kg
+    v_f_run_tank(n) = 1 / py.CoolProp.CoolProp.PropsSI('D', 'T', T_run_tank(n), 'Q', 0, fluid);
+    v_g_run_tank(n) = 1 / py.CoolProp.CoolProp.PropsSI('D', 'T', T_run_tank(n), 'Q', 1, fluid);
+    %mu_run_tank(n) = py.CoolProp.CoolProp.PropsSI('V', 'T', T_run_tank(n), 'Q', x_run_tank(n), fluid) * 1e6; %Pa*s to uPa*s
+    %P_run_tank(n) = get_state_variable(T_run_tank(n), x_run_tank(n), "Pressure_Mpa", liquid_properties, vapor_properties);
+    %h_g_run_tank(n) = get_state_variable(T_run_tank(n), "g", "Enthalpy_kJ__kg", liquid_properties, vapor_properties);
+    %v_f_run_tank(n) = get_state_variable(T_run_tank(n), "f", "Volume_m3_kg", liquid_properties, vapor_properties);
+    %v_g_run_tank(n) = get_state_variable(T_run_tank(n), "g", "Volume_m3_kg", liquid_properties, vapor_properties);
     mu_run_tank(n) = get_state_variable(T_run_tank(n), x_run_tank(n), "Viscosity_uPa_s", liquid_properties, vapor_properties);
 
     % New energy in bottle
@@ -161,11 +183,16 @@ for n = 2:length(t)-1
 
     % New state in bottle
     v_bottle(n) = vol_bottle / m_bottle(n);
-    [T_bottle(n), x_bottle(n)] = state_density(1 / v_bottle(n), u_bottle(n), T_bottle(n-1), liquid_properties, vapor_properties);
-    P_bottle(n) = get_state_variable(T_bottle(n), x_bottle(n), "Pressure_Mpa", liquid_properties, vapor_properties);
-    h_f_bottle(n) = get_state_variable(T_bottle(n), "f", "Enthalpy_kJ__kg", liquid_properties, vapor_properties);
-    v_f_bottle(n) = get_state_variable(T_bottle(n), "f", "Volume_m3_kg", liquid_properties, vapor_properties);
-    v_g_bottle(n) = get_state_variable(T_bottle(n), "g", "Volume_m3_kg", liquid_properties, vapor_properties);
+    [T_bottle(n), x_bottle(n)] = state_density(1 / v_bottle(n), u_bottle(n), T_bottle(n-1));
+    P_bottle(n) = py.CoolProp.CoolProp.PropsSI('P', 'T', T_bottle(n), 'Q', x_bottle(n), fluid) / 1e6; %Pa to MPa
+    h_f_bottle(n) = py.CoolProp.CoolProp.PropsSI('H', 'T', T_bottle(n), 'Q', 0, fluid) / 1000; %J/kg to kJ/kg
+    v_f_bottle(n) = 1 / py.CoolProp.CoolProp.PropsSI('D', 'T', T_bottle(n), 'Q', 0, fluid);
+    v_g_bottle(n) = 1 / py.CoolProp.CoolProp.PropsSI('D', 'T', T_bottle(n), 'Q', 1, fluid);
+    %mu_bottle(n) = py.CoolProp.CoolProp.PropsSI('V', 'T', T_bottle(n), 'Q', x_bottle(n), fluid) * 1e6; %Pa*s to uPa*s
+    %P_bottle(n) = get_state_variable(T_bottle(n), x_bottle(n), "Pressure_Mpa", liquid_properties, vapor_properties);
+    %h_f_bottle(n) = get_state_variable(T_bottle(n), "f", "Enthalpy_kJ__kg", liquid_properties, vapor_properties);
+    %v_f_bottle(n) = get_state_variable(T_bottle(n), "f", "Volume_m3_kg", liquid_properties, vapor_properties);
+    %v_g_bottle(n) = get_state_variable(T_bottle(n), "g", "Volume_m3_kg", liquid_properties, vapor_properties);
     mu_bottle(n) = get_state_variable(T_bottle(n), x_bottle(n), "Viscosity_uPa_s", liquid_properties, vapor_properties);
 
     % Display time every minute
