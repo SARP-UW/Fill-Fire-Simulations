@@ -1,6 +1,6 @@
 % This is the main function for Version 1 of the engine simulation.
 
-addpath("ThroatAnalysis/");
+%addpath("ThroatAnalysis/");
 
 %% Vector allocation
 
@@ -238,9 +238,9 @@ for i = 2:N-1
         fuel_out = 1;
         break;
     end
-    n2_ullage_volume(i) = n2_ullage_volume(i-1) + ethanol_mdot(i) / ethanol_density * dt;
-    n2_ullage_pressure(i) = n2_ullage_pressure(i-1) * n2_ullage_volume(i-1) / n2_ullage_volume(i);
-
+    % n2_ullage_volume(i) = n2_ullage_volume(i-1) + ethanol_mdot(i) / ethanol_density * dt;
+    % n2_ullage_pressure(i) = n2_ullage_pressure(i-1) * n2_ullage_volume(i-1) / n2_ullage_volume(i);
+    n2_ullage_pressure(i) = N2O_tank_pressure(i) - 220632.233;
     % Update ethanol tank COM (measured from the bottom of the tank)
     ethanol_COM(i) = (n2_mass * (total_e_tank_V / tank_area - (n2_ullage_volume(i) / tank_area) / 2) + ethanol_mass(i) * (((total_e_tank_V - n2_ullage_volume(i)) / tank_area) / 2)) / (n2_mass + ethanol_mass(i));
 
