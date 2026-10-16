@@ -5,7 +5,7 @@
 %% Vector allocation
 
 % Time and Timestep
-final_t = 9; % (s)
+final_t = 10; % (s)
 dt = 0.01;   % (s)
 N = final_t / dt + 1;
 t = zeros(1, N);
@@ -84,7 +84,7 @@ tempK = ((temp-32) * 5/9) + 273.15; % convert to kelvin
 N2O_tank_pressure(1) = lookup_property(tempK, 1, 2, matrix=liq_props) * 10^6; % (Pa)
 N2O_tank_density(1) = py.CoolProp.CoolProp.PropsSI('D', 'P', N2O_tank_pressure(1), 'Q', 0, 'NitrousOxide'); % (kg/m^3)
 N2O_tank_density_V(1) = py.CoolProp.CoolProp.PropsSI('D', 'P', N2O_tank_pressure(1), 'Q', 1, 'NitrousOxide'); % (kg/m^3)
-N2O_mass(1) = 6.2; % (kg)
+N2O_mass(1) = 4.95; % (kg)
 N2O_tank_volume = 0.008331625788; % (m^3)
 N2O_vapor_volume(1) = 0.1 * N2O_tank_volume; % 0.1 because of the diptube
 N2O_liquid_volume(1) = 0.9 * N2O_tank_volume;
