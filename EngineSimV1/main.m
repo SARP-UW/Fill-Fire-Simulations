@@ -1,11 +1,11 @@
 % This is the main function for Version 1 of the engine simulation.
 
 %addpath("ThroatAnalysis/");
-
+close all;
 %% Vector allocation
 
 % Time and Timestep
-final_t = 10; % (s)
+final_t = 9; % (s)
 dt = 0.01;   % (s)
 N = final_t / dt + 1;
 t = zeros(1, N);
@@ -84,56 +84,73 @@ tempK = ((temp-32) * 5/9) + 273.15; % convert to kelvin
 N2O_tank_pressure(1) = lookup_property(tempK, 1, 2, matrix=liq_props) * 10^6; % (Pa)
 N2O_tank_density(1) = py.CoolProp.CoolProp.PropsSI('D', 'P', N2O_tank_pressure(1), 'Q', 0, 'NitrousOxide'); % (kg/m^3)
 N2O_tank_density_V(1) = py.CoolProp.CoolProp.PropsSI('D', 'P', N2O_tank_pressure(1), 'Q', 1, 'NitrousOxide'); % (kg/m^3)
-N2O_mass(1) = 4.95; % (kg)
-N2O_tank_volume = 0.008331625788; % (m^3)
+N2O_mass(1) = 4.967113863; % (kg)
+N2O_tank_volume = 0.005913230789; % (m^3)
 N2O_vapor_volume(1) = 0.1 * N2O_tank_volume; % 0.1 because of the diptube
 N2O_liquid_volume(1) = 0.9 * N2O_tank_volume;
-tank_area = pi * 0.06985^2; % (m^2), internal cross sectional area, same for both tanks
-N2O_COM(1) = (N2O_vapor_volume(1)*N2O_tank_density_V(1) * (N2O_liquid_volume(1)/tank_area+(N2O_vapor_volume(1)/(tank_area*2))) + N2O_liquid_volume(1)*N2O_tank_density(1)*(N2O_liquid_volume(1)/tank_area)/2) / (N2O_vapor_volume(1)*N2O_tank_density_V(1) + N2O_liquid_volume(1)*N2O_tank_density(1));  
+% tank_area = pi * 0.06985^2; % (m^2), internal cross sectional area, same for both tanks
+% no longer using the same tank_area, see below:
+
+%% Changing tank geometry to concentric:
+R_outer_ID = 0.073025; % m, outer tank inner radius
+R_inner_OD = 0.0381; % m, inner (ethanol) tank outer radius
+t_inner_wall = 0.00127; % m, inner tank wall thickness
+
+R_inner_ID = R_inner_OD - t_inner_wall;
+A_ethanol = pi * R_inner_ID^2;
+A_N2O = pi * (R_outer_ID^2 - R_inner_OD^2);
+
+% updating all tank area mentions
+N2O_COM(1) = (N2O_vapor_volume(1)*N2O_tank_density_V(1) * (N2O_liquid_volume(1)/A_N2O+(N2O_vapor_volume(1)/(A_N2O*2))) + N2O_liquid_volume(1)*N2O_tank_density(1)*(N2O_liquid_volume(1)/A_N2O)/2) / (N2O_vapor_volume(1)*N2O_tank_density_V(1) + N2O_liquid_volume(1)*N2O_tank_density(1));  
 phase(1) = "liquid";
 ox_out = 0;
 startPSI = N2O_tank_pressure(1) / 6895;
 
 % N2O-injector
-N2O_Cd = 0.78;
-N2O_inj_a = 0.000047; % m^2  % 0.0000295205 match phase change to eth-out
+N2O_Cd = 0.7;
+N2O_inj_a = 0.000113901; % m^2  % 0.0000295205 match phase change to eth-out
 N2O_CdA = N2O_Cd * N2O_inj_a;
-N2O_Cd_HEM = 0.78;
+N2O_Cd_HEM = 0.7;
 N2O_CdA_HEM = N2O_Cd_HEM * N2O_inj_a;
 N2O_inj_P(1) = N2O_tank_pressure(1);
 N2O_mdot(1) = mSPI(N2O_CdA, N2O_inj_P(1), 1, "liquid", 'nitrous') * 0.1;
 N2O_ldot(1) = N2O_mdot(1) / N2O_tank_density(1) * 1000;
-N2O_inj_stiffness = .20;
+N2O_inj_stiffness = 0.37;
 N2O_inj_dP(1) = N2O_inj_P(1) * N2O_inj_stiffness;
 
 % Ethanol-tank 
-ethanol_mass(1) = 1.6; % (kg)
+ethanol_mass(1) = 1.632886137; % (kg)
 ethanol_conc = 0.9;
 n2_ullage_pressure(1) = N2O_tank_pressure(1) - 220632.233; % (Pa) 220632.233 Pa is 30 psi, piston friction losses
 %n2_ullage_volume(1) = 3.9 / 1000; % (m^3) % should be 3.9
 %n2_mass = n2_ullage_volume(1) * 67; % (kg), N2 density acquired from NIST table
 ethanol_density = 850; % (kg/m^3)
-ethanol_tank_volume(1) = 0.00234; % (m^3)
+ethanol_tank_volume(1) = 0.002069564179; % (m^3)
 %ethanol_COM(1) = (n2_mass * (total_e_tank_V / (pi * 0.06985^2) - (n2_ullage_volume(1) / (pi * 0.06985^2)) / 2) + ethanol_mass(1) * (((total_e_tank_V - n2_ullage_volume(1)) / (pi * 0.06985^2)) / 2)) / (n2_mass + ethanol_mass(1));
-ethanol_COM(1) = ((ethanol_tank_volume(1) / tank_area) / 2) + N2O_vapor_volume(1)/tank_area + N2O_liquid_volume(1)/tank_area;
+
+% updating all tank area mentions
+
+pistonPosition(1) = 0.516382; % m
+piston_thickness = 0.0762; 
+
+ethanol_COM(1) = pistonPosition(1) - piston_thickness/2 - ((ethanol_tank_volume(1) / A_ethanol) / 2);
 den_tran = 0; % Don't change
 fuel_out = 0;
 
-pistonMass = 0.907185; % kg, 2 lb
-pistonPosition(1) = 0.544; % in meters, or 21.4", 6" from top of bulkhead
+pistonMass = 0.4535925; % kg, 1 lb
 tankCOM(1) = ((N2O_COM(1) * (N2O_liquid_volume(1) * N2O_tank_density(1) + N2O_vapor_volume(1) * N2O_tank_density_V(1))) + pistonPosition(1)*pistonMass + ethanol_COM(1)*ethanol_tank_volume(1)*ethanol_density)/((N2O_liquid_volume(1) * N2O_tank_density(1) + N2O_vapor_volume(1) * N2O_tank_density_V(1)) + pistonMass + ethanol_tank_volume(1)*ethanol_density);
 
 % Ethanol-injector 
-e_inj_a = 0.00003418; %m^2
-e_Cd = 0.2096;
+e_inj_a = 0.000018683; % m^2
+e_Cd = 0.9;
 e_CdA = e_inj_a * e_Cd;
 ethanol_inj_P(1) = n2_ullage_pressure(1);
 ethanol_mdot(1) = mSPI(e_CdA, ethanol_inj_P(1), chamber_pressure(1), 'liquid', 'ethanol');
 ethanol_ldot(1) = ethanol_mdot(1) / ethanol_density * 1000;
 
 % N2O Feed Line
-N2O_line_length = 0.3556001016; % m
-N2O_line_id = 0.0102108; % (m)
+N2O_line_length = 0.2032; % m
+N2O_line_id = 0.0127; % (m)
 N2O_line_abs_rough = 1.500124e-5; % m
 N2O_K_loss = 0.3562911503+0.3487562189+0.5+1;
 raw_N2O_line_dP(1) = get_pressuredrop(N2O_mdot(1), N2O_tank_density(1), N2O_inj_a, N2O_K_loss, N2O_line_length, N2O_line_id);
@@ -141,7 +158,7 @@ raw_N2O_line_dP(1) = get_pressuredrop(N2O_mdot(1), N2O_tank_density(1), N2O_inj_
 
 % Ethanol Feed Line
 ethanol_line_abs_rough = 1.500124e-5; % m
-ethanol_line_length = 1.12776; % m
+ethanol_line_length = 0.2032; % m
 ethanol_line_id = 0.007747; % m
 ethanol_K_loss = 0.9943489899+0.4278688525+0.5+1;
 ethanol_abs_visc = 1.04/1000; % Pa-s
@@ -150,7 +167,7 @@ ethanol_abs_visc = 1.04/1000; % Pa-s
 mdot_total(1) = N2O_mdot(1) + ethanol_mdot(1);
 chamber_pressure(1) = 1e5; % Pa         (1.818955544220220e+05)
 of_ratio(1) = N2O_mdot(1) / ethanol_mdot(1);
-dry_mass = 44; % (kg)
+dry_mass = 31; % (kg)
 total_mass(1) = dry_mass + N2O_mass(1) + ethanol_mass(1);
 mdot_out = 0;
 thrust_out = 0;
@@ -265,7 +282,7 @@ for i = 2:N-1
     end
     % 
     % % Update N2O COM (measured from the bottom of the tank)
-    N2O_COM(i) = (N2O_vapor_volume(i)*N2O_tank_density_V(i) * (N2O_liquid_volume(i)/tank_area+(N2O_vapor_volume(i)/(tank_area*2))) + N2O_liquid_volume(i)*N2O_tank_density(i)*(N2O_liquid_volume(i)/tank_area)/2) / (N2O_vapor_volume(i)*N2O_tank_density_V(i) + N2O_liquid_volume(i)*N2O_tank_density(i));  
+    N2O_COM(i) = (N2O_vapor_volume(i)*N2O_tank_density_V(i) * (N2O_liquid_volume(i)/A_N2O+(N2O_vapor_volume(i)/(A_N2O*2))) + N2O_liquid_volume(i)*N2O_tank_density(i)*(N2O_liquid_volume(i)/A_N2O)/2) / (N2O_vapor_volume(i)*N2O_tank_density_V(i) + N2O_liquid_volume(i)*N2O_tank_density(i));  
 
     % Update ethanol mass, volume, and pressure
     ethanol_mass(i) = ethanol_mass(i-1) - dt * ethanol_mdot(i);
@@ -276,11 +293,16 @@ for i = 2:N-1
     end
     ethanol_tank_volume(i) = ethanol_mass(i) / ethanol_density;
     % n2_ullage_pressure(i) = n2_ullage_pressure(i-1) * n2_ullage_volume(i-1) / n2_ullage_volume(i);
-    n2_ullage_pressure(i) = N2O_tank_pressure(i) - 220632.233;
-    % Update ethanol tank COM (measured from the bottom of the tank)
-    ethanol_COM(i) = (ethanol_tank_volume(i) / tank_area)/2 + N2O_vapor_volume(i) / tank_area + N2O_liquid_volume(i) / tank_area;
+
+    %% LOOK AT ME - 220632.233
+    piston_friction_pressure = 220632.233;
+    n2_ullage_pressure(i) = N2O_tank_pressure(i) - piston_friction_pressure;
     
-    pistonPosition(i) = pistonPosition(i-1) + ((N2O_liquid_volume(i)/tank_area) + (N2O_vapor_volume(i)/tank_area)) - ((N2O_liquid_volume(i-1)/tank_area) + (N2O_vapor_volume(i-1)/tank_area));
+    pistonPosition(i) = pistonPosition(i-1) - (ethanol_tank_volume(i-1) - ethanol_tank_volume(i)) / A_ethanol;
+    
+    % Update ethanol tank COM (measured from the bottom of the tank)
+    ethanol_COM(i) = pistonPosition(i) - (ethanol_tank_volume(i) / A_ethanol)/2 - piston_thickness/2;
+    
     tankCOM(i) = ((N2O_COM(i) * (N2O_liquid_volume(i) * N2O_tank_density(i) + N2O_vapor_volume(i) * N2O_tank_density_V(i))) + pistonPosition(i)*pistonMass + ethanol_COM(i)*ethanol_tank_volume(i)*ethanol_density)/((N2O_liquid_volume(i) * N2O_tank_density(i) + N2O_vapor_volume(i) * N2O_tank_density_V(i)) + pistonMass + ethanol_tank_volume(i)*ethanol_density);
 
         
@@ -324,7 +346,7 @@ for i = 2:N-1
 
     % Update total mass flow, OF ratio, chamber pressure, and thrust
     mdot_total(i) = N2O_mdot(i) + ethanol_mdot(i);
-    if mdot_total(i) < 0.2
+    if mdot_total(i) < 0.02
         mdot_out = 1;
         break;
     end
@@ -692,8 +714,8 @@ function [P_c_new,F_new,chokeValue, T_c_new] = TransientThrustCurveAnalysis(cali
         m_dot (1,1) {mustBeReal, mustBePositive} = 1.27 % temporary
         of_sim (1,1) {mustBeReal, mustBePositive} = 4 % temp
         P_0 (1,1) {mustBeReal, mustBePositive} = 101325 % optional
-        A_e (1,1) {mustBeReal, mustBePositive} = 30.90316 * (1/100)^2 % optional
-        A_t (1,1) {mustBeReal, mustBePositive} = 0.0005691190424048 % optional
+        A_e (1,1) {mustBeReal, mustBePositive} = 0.007661468015 % optional
+        A_t (1,1) {mustBeReal, mustBePositive} = 0.001228232392 % optional
     end
 
     load(calibration_data);
