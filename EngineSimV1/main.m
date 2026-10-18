@@ -41,11 +41,13 @@ n2_ullage_pressure = zeros(1, N);
 %n2_ullage_volume = zeros(1, N);
 ethanol_tank_volume = zeros(1, N);
 ethanol_COM = zeros(1, N);
+N2O_inj_stiffness = zeros(1,N);
 
 % Ethanol-injector 
 ethanol_inj_P = zeros(1, N);
 ethanol_mdot = zeros(1, N);
 ethanol_ldot = zeros(1, N);
+ethanol_inj_dP = zeros(1,N);
 
 % N2O Feed Line
 raw_N2O_line_dP = zeros(1,N);
@@ -76,7 +78,7 @@ props_matrix = liq_props;
 %% Inputs and initial conditions
 
 % Outside Temp (will set tank pressures)
-temp = 50; % degrees F
+temp = 52.5; % degrees F
 tempK = ((temp-32) * 5/9) + 273.15; % convert to kelvin
 
 % N2O-tank 
@@ -115,8 +117,8 @@ N2O_CdA_HEM = N2O_Cd_HEM * N2O_inj_a;
 N2O_inj_P(1) = N2O_tank_pressure(1);
 N2O_mdot(1) = mSPI(N2O_CdA, N2O_inj_P(1), 1, "liquid", 'nitrous') * 0.1;
 N2O_ldot(1) = N2O_mdot(1) / N2O_tank_density(1) * 1000;
-N2O_inj_stiffness = 0.37;
-N2O_inj_dP(1) = N2O_inj_P(1) * N2O_inj_stiffness;
+N2O_inj_stiffness(1) = 0.37;
+N2O_inj_dP(1) = N2O_inj_P(1) * N2O_inj_stiffness(1);
 
 % Ethanol-tank 
 ethanol_mass(1) = 1.632886137; % (kg)
@@ -124,7 +126,7 @@ ethanol_conc = 0.9;
 n2_ullage_pressure(1) = N2O_tank_pressure(1) - 220632.233; % (Pa) 220632.233 Pa is 30 psi, piston friction losses
 %n2_ullage_volume(1) = 3.9 / 1000; % (m^3) % should be 3.9
 %n2_mass = n2_ullage_volume(1) * 67; % (kg), N2 density acquired from NIST table
-ethanol_density = 850; % (kg/m^3)
+ethanol_density = 789.45; % (kg/m^3)
 ethanol_tank_volume(1) = 0.002069564179; % (m^3)
 %ethanol_COM(1) = (n2_mass * (total_e_tank_V / (pi * 0.06985^2) - (n2_ullage_volume(1) / (pi * 0.06985^2)) / 2) + ethanol_mass(1) * (((total_e_tank_V - n2_ullage_volume(1)) / (pi * 0.06985^2)) / 2)) / (n2_mass + ethanol_mass(1));
 
@@ -145,12 +147,13 @@ e_inj_a = 0.000018683; % m^2
 e_Cd = 0.9;
 e_CdA = e_inj_a * e_Cd;
 ethanol_inj_P(1) = n2_ullage_pressure(1);
+ethanol_inj_dP(1) = ethanol_inj_P(1);
 ethanol_mdot(1) = mSPI(e_CdA, ethanol_inj_P(1), chamber_pressure(1), 'liquid', 'ethanol');
 ethanol_ldot(1) = ethanol_mdot(1) / ethanol_density * 1000;
 
 % N2O Feed Line
 N2O_line_length = 0.2032; % m
-N2O_line_id = 0.0127; % (m)
+N2O_line_id = 0.015875; % (m)
 N2O_line_abs_rough = 1.500124e-5; % m
 N2O_K_loss = 0.3562911503+0.3487562189+0.5+1;
 raw_N2O_line_dP(1) = get_pressuredrop(N2O_mdot(1), N2O_tank_density(1), N2O_inj_a, N2O_K_loss, N2O_line_length, N2O_line_id);
@@ -159,7 +162,7 @@ raw_N2O_line_dP(1) = get_pressuredrop(N2O_mdot(1), N2O_tank_density(1), N2O_inj_
 % Ethanol Feed Line
 ethanol_line_abs_rough = 1.500124e-5; % m
 ethanol_line_length = 0.2032; % m
-ethanol_line_id = 0.007747; % m
+ethanol_line_id = 0.0127; % m
 ethanol_K_loss = 0.9943489899+0.4278688525+0.5+1;
 ethanol_abs_visc = 1.04/1000; % Pa-s
 
@@ -199,7 +202,9 @@ for i = 2:N-1
     % Update N2O mass flow by FML model
     mdot_SPI(i) = mSPI(N2O_CdA, N2O_inj_P(i-1), chamber_pressure(i-1), phase(i), 'nitrous');
     mdot_SPC(i) = m_SPC(N2O_Cd, N2O_inj_a, N2O_inj_P(i-1), N2O_tank_pressure(i-1), chamber_pressure(i-1), phase(i));
-    voidFraction = get_voidFraction(chamber_pressure(i-1), N2O_inj_P(i-1), phase(i));
+    %voidFraction = get_voidFraction(chamber_pressure(i-1), N2O_inj_P(i-1), phase(i));
+    voidFraction = 1;
+    vFracstorage(i) = voidFraction;
     if strcmp(phase(i), 'liquid')
         mdot_HEM(i) = m_HEMc(N2O_inj_P(i-1), chamber_pressure(i-1), N2O_CdA_HEM, phase(i));
         N2O_mdot(i) = (1 - voidFraction) * mdot_SPC(i) + voidFraction * mdot_HEM(i);
@@ -229,6 +234,8 @@ for i = 2:N-1
     % Get ethanol mass flow
     ethanol_mdot(i) = mSPI(e_CdA, ethanol_inj_P(i-1), chamber_pressure(i-1), "liquid", 'ethanol');
     ethanol_ldot(i) = ethanol_mdot(i) / ethanol_density * 1000;
+
+    ethanol_inj_dP(i) = ethanol_inj_P(i-1)-chamber_pressure(i-1);
 
     % Update N2O mass and pressure
     N2O_mass(i) = N2O_mass(i-1) - dt * N2O_mdot(i);
@@ -295,8 +302,8 @@ for i = 2:N-1
     % n2_ullage_pressure(i) = n2_ullage_pressure(i-1) * n2_ullage_volume(i-1) / n2_ullage_volume(i);
 
     %% LOOK AT ME - 220632.233
-    piston_friction_pressure = 220632.233;
-    n2_ullage_pressure(i) = N2O_tank_pressure(i) - piston_friction_pressure;
+    piston_friction_pressure = 220632.233*(0);
+    n2_ullage_pressure(i) = N2O_tank_pressure(i) - piston_friction_pressure; %this is actually the ethanol volume pressure due to the piston
     
     pistonPosition(i) = pistonPosition(i-1) - (ethanol_tank_volume(i-1) - ethanol_tank_volume(i)) / A_ethanol;
     
@@ -323,8 +330,9 @@ for i = 2:N-1
     % N2O injector pressure stabilization
     N2O_inj_P(i) = (N2O_inj_P(i-1) + N2O_inj_P(i)) / 2;
 
-    N2O_inj_dP(i) = N2O_inj_P(i) * N2O_inj_stiffness;
-
+    %N2O_inj_dP(i) = N2O_inj_P(i) * N2O_inj_stiffness;
+    N2O_inj_dP(i) = N2O_inj_P(i-1) - chamber_pressure(i-1);
+    N2O_inj_stiffness(i) = N2O_inj_dP(i-1)/chamber_pressure(i-1);
     % % If the sim is breaking, bound injector pressure conditions
     % if N2O_inj_P(i) < chamber_pressure(i-1)
     %     N2O_inj_P(i) = chamber_pressure(i-1) + 1e6;
@@ -359,8 +367,8 @@ for i = 2:N-1
     % end
         
     % Grow chamber pressure slowly at start
-    if i < 3
-        chamber_pressure(i) = chamber_pressure(i) * i / 3;
+    if i < 5
+        chamber_pressure(i) = chamber_pressure(i) * i / 5;
     % else
     %     if chamber_pressure(i) > chamber_pressure(i-1)
     %         chamber_pressure(i) = chamber_pressure(i-1);
@@ -392,6 +400,7 @@ for i = 2:N-1
         end
     end
 
+    manifolddelta(i) = ethanol_inj_P(i)-N2O_inj_P(i);
     % Update impulse and specific impulse
     impulse(i) = impulse(i-1) + thrust(i) * dt;
     ISP(i) = thrust(i) / (mdot_total(i) * 9.81);
@@ -628,7 +637,8 @@ function mdot = mSPI(CdA, P_inj_inlet, P_chamber, phase, fluid)
         Q = 1;
     end
     if fluid == 'ethanol'
-        rho_inlet = py.CoolProp.CoolProp.PropsSI('D', 'P', P_inj_inlet, 'Q', Q, 'Ethanol');
+        %rho_inlet = py.CoolProp.CoolProp.PropsSI('D', 'P', P_inj_inlet, 'Q', Q, 'Ethanol');
+        rho_inlet = 789.45;
     else
         rho_inlet = py.CoolProp.CoolProp.PropsSI('D', 'P', P_inj_inlet, 'Q', Q, 'NitrousOxide');
     end
@@ -714,7 +724,7 @@ function [P_c_new,F_new,chokeValue, T_c_new] = TransientThrustCurveAnalysis(cali
         m_dot (1,1) {mustBeReal, mustBePositive} = 1.27 % temporary
         of_sim (1,1) {mustBeReal, mustBePositive} = 4 % temp
         P_0 (1,1) {mustBeReal, mustBePositive} = 101325 % optional
-        A_e (1,1) {mustBeReal, mustBePositive} = 0.007661468015 % optional
+        A_e (1,1) {mustBeReal, mustBePositive} = 0.006077645841 % optional
         A_t (1,1) {mustBeReal, mustBePositive} = 0.001228232392 % optional
     end
 
@@ -742,6 +752,7 @@ function [P_c_new,F_new,chokeValue, T_c_new] = TransientThrustCurveAnalysis(cali
         of_index = interp1( of(1,1:end), 1:numel(of(1,1:end)), round( of_sim, 1) );
     end
     
+
     if P_c_sim < data.P_c(1)
         P_c_index = 1;
         %fprintf('warning! pressure is less than data range!')
@@ -754,8 +765,9 @@ function [P_c_new,F_new,chokeValue, T_c_new] = TransientThrustCurveAnalysis(cali
     
     c_star_new = interp2(c_star, of_index, P_c_index, 'linear');
     c_star_adjustment_factor = 0.9;
+    thrustcoeff_adjustment_factor = 0.95;
     P_c_new = (c_star_new*c_star_adjustment_factor) * m_dot / A_t;
-    
+
     M_e_new = interp2(M_e, of_index, P_c_index, 'linear' );
     a_e_new = interp2(a_e, of_index, P_c_index, 'linear' );
     P_e_new = interp2(P_e, of_index, P_c_index, 'linear' );
@@ -764,7 +776,7 @@ function [P_c_new,F_new,chokeValue, T_c_new] = TransientThrustCurveAnalysis(cali
     gamma_t_new = interp2(gamma_t, of_index, P_c_index,'linear');
     T_c_new = interp2(T_c, of_index ,P_c_index, 'linear');
     
-    v_e_new = M_e_new.*a_e_new;
+    v_e_new = M_e_new.*a_e_new*c_star_adjustment_factor*thrustcoeff_adjustment_factor;
     F_new = m_dot.*v_e_new + (P_e_new - P_0)*A_e;
 
     P_crit = P_c_new*(2 / (gamma_t_new + 1))^( gamma_t_new/(gamma_t_new - 1 ) );
